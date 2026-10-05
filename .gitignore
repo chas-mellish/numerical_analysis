@@ -1,0 +1,28 @@
+# Compiled objects
+*.o
+*.out
+*.exe
+*.mod
+
+# Fortran compiler artifacts
+*.a
+*.so
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*~
+
+# Python artifacts
+__pycache__/
+*.pyc
+.pyo
+.env/
+
+# ModelCode AI generated files (if needed)
+.mcode-cache/
+
+# Temporary files
+tmp/
+temp/
