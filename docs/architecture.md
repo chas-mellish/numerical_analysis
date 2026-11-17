@@ -170,6 +170,12 @@ Exact-integer expectations (`iterations`, `subintervals`, row counts) are compar
 * Default (real64) Fortran builds and the Python engine are compared against `real64_value`
   (tight), when present, and against `book_value` within `tol_real64`.
 * A `SINGLE` Fortran build is compared against `book_value` within `tol_real32`.
+* `tol_real32` equals `tol_real64` wherever binary32 can reach the book digits. The exception is
+  `ch04_p01` (central difference): the book's 8-digit machine is more precise than IEEE binary32,
+  so the SINGLE driver deviates from the book by up to 1.5E-9 in H, 2.0E-9 in DX and 2.7E-7 in
+  DDX, and its `tol_real32` for `h`, `dx`, `ddx`, `first_dx`, `first_ddx` and `last_ddx` is
+  deliberately looser than `tol_real64` (tightening it would fail the SINGLE golden run). The
+  reasoning is recorded in that entry's `precision_notes`.
 * Iteration counts are compared exactly; any exception caused by precision is documented in the
   program's errata.
 
