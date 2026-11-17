@@ -97,6 +97,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="verify every catalog entry and its referenced files (exit 1 on problems)",
     )
     catalog_check.set_defaults(handler=_catalog_check)
+    catalog_index = catalog_commands.add_parser(
+        "index",
+        help="print the README program index; --check/--write the generated Markdown blocks",
+        description=(
+            "Render the Markdown generated from the catalog: the program index between the "
+            "PROGRAM_INDEX markers of README.md and the errata table between the ERRATA_TABLE "
+            "markers of every study page. Without options the index is printed. --check exits "
+            "with status 1 when a block is out of date; --write rewrites the stale blocks "
+            "(make readme-index)."
+        ),
+    )
+    mode = catalog_index.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--check", action="store_true", help="exit 1 if README.md or a study page is stale"
+    )
+    mode.add_argument("--write", action="store_true", help="update README.md and the study pages")
+    catalog_index.set_defaults(handler=_catalog_index)
     return parser
 
 
@@ -138,6 +155,37 @@ def _catalog_check(_args: argparse.Namespace) -> int:
             print(f"  {problem}", file=sys.stderr)
         return 1
     print(f"catalog OK: {len(registry)} program(s), every referenced file present")
+    return 0
+
+
+def _catalog_index(args: argparse.Namespace) -> int:
+    from gerald_na.registry.generated import generated_files, render_program_index
+
+    try:
+        registry = Registry.load(get_settings().repo_root)
+        if not (args.check or args.write):
+            sys.stdout.write(render_program_index(registry))
+            return 0
+        files = generated_files(registry)
+    except CatalogError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    stale = [item for item in files if item.stale]
+    if args.check:
+        if stale:
+            print(
+                "out of date (run `make readme-index`): "
+                + ", ".join(item.relative for item in stale),
+                file=sys.stderr,
+            )
+            return 1
+        print(f"generated Markdown up to date in {len(files)} file(s)")
+        return 0
+    for item in stale:
+        item.path.write_text(item.expected, encoding="utf-8")
+        print(f"updated {item.relative}")
+    if not stale:
+        print(f"generated Markdown already up to date in {len(files)} file(s)")
     return 0
 
 

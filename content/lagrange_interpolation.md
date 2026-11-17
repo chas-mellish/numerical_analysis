@@ -86,7 +86,7 @@ The terms of the book run (real64):
 
 The error against ASINH(5) is 5.4 × 10⁻⁴. That is interpolation error, not rounding error.
 
-## Other outcomes
+## Other outcomes the program handles
 
 The original program had no checks. The modern programs add them, and both engines report the
 same errors:
@@ -101,27 +101,30 @@ same errors:
 
 ## Errata
 
-There is no scan, so the "corrected" column comes from syntax, the Hollerith counts and the
-printed result, not from a page image. Every row is also in the catalog `errata` list and the
-ERRATA header of `fortran/app/lagrange_interpolation.f90`.
+There is no scan, so the "corrected" column comes from syntax, the Hollerith counts and the printed
+result, not from a page image. The table below is generated from the catalog `errata` list (`make
+readme-index`), so it carries every erratum with the catalog's id, kind and wording; the Fortran
+ERRATA header of `fortran/app/lagrange_interpolation.f90` lists the same ids.
 
-| Id | Kind | OCR text / original | Corrected | Note |
+<!-- ERRATA_TABLE_START -->
+| Id | Kind | Original | Corrected | Note |
 |---|---|---|---|---|
-| arithmetic-if-operator | OCR slip | `IF (I=J) 9,10,9` | `IF (I-J) 9,10,9` | an arithmetic IF takes an expression; J = I is skipped |
-| product-term-parentheses | OCR slip | `TERM*(XIN - X(J)/X(I) - X(J))` | `TERM*(XIN - X(J))/(X(I) - X(J))` | only this is the basis polynomial and gives 2.3119 |
-| format-i2 | OCR slip | `FORMAT (12/(2F10.0))` | `FORMAT (I2/(2F10.0))` | "I" read as "1"; N is read with I2 (`05`) |
-| pair-column-order | OCR slip | `2.3756  1.6` (spacing collapsed) | X in columns 1–10, Y in 11–20 | X(I), Y(I) order verified: 2.3119 vs 63.35 swapped |
-| output-spacing | OCR slip | `AMONG     5 VALUES,` / `AT X=   5.0000 …    2.3119` | `AMONG   5 VALUES,` / `AT X =      5.000 …     2.3119` | Hollerith counts 49, 8, 8, 27 fix the layout; F10.3 cannot print 5.0000 |
-| trailing-05-card | OCR slip | a second `05` card after `5.0` | not part of the data | never read by the program; uncertain without a scan |
-| file-extension-and-columns | OCR slip | `polynomial.F90`, ragged columns | fixed-form card layout; free-form modern source | `.F90` means free form + preprocessor, wrong for this listing |
-| deck-control-cards | original quirk | `ZZJOB`, `ZZFORX5`, `*LIST PRINTER`, `ZZZZ` | dropped | job control, not FORTRAN |
-| dimension-limit | modernization | `DIMENSION X(10), Y(10)`, no check | N must be 1–10 (`DEGREE`) | N > 10 overran the arrays |
-| duplicate-x | modernization | division by zero for equal X | `INPUT` error naming the pair | −0.0 and +0.0 count as equal |
-| non-finite-values | modernization | no check | overflow is an `INPUT` error | only with extreme data |
-| list-directed-input | modernization | fixed card columns | list-directed read in the same order | printed cards work unchanged; N must match the pairs |
-| structured-control-flow | modernization | arithmetic IF, `CONTINUE`, `CALL EXIT` | `IF (I /= J)` in `DO … END DO`; exit status | both nonzero branches went to label 9 |
-| truncated-digits | original quirk | printer chops digits, no leading zero | book text uses RZ and no leading zero | same machine as the bisection deck; no effect on the book card |
-| unconfirmed-book-reference | original quirk | file in `chapter_2/`, no scan | id `lagrange_interpolation`, `book_ref_confirmed = false` | can be confirmed later without renaming |
+| `arithmetic-if-operator` | OCR slip | IF (I=J) 9,10,9 | IF (I-J) 9,10,9 | An arithmetic IF takes an expression; I-J is zero exactly when J = I, whose factor is skipped. The modern code writes IF (I /= J). |
+| `product-term-parentheses` | OCR slip | 9 TERM = TERM\*(XIN - X(J)/X(I) - X(J)) | 9 TERM = TERM\*(XIN - X(J))/(X(I) - X(J)) | The OCR lost the parentheses around the division. Only the corrected factor is the Lagrange basis polynomial, and only it reproduces the printed 2.3119. Evaluated left to right, (TERM\*(XIN - X(J)))/(X(I) - X(J)), in both engines. |
+| `format-i2` | OCR slip | 100 FORMAT (12/(2F10.0)) | 100 FORMAT (I2/(2F10.0)) | "I" was read as "1". N is read with I2 from the first card (05); format reversion then reads one X, Y pair per card with 2F10.0. |
+| `pair-column-order` | OCR slip | data cards printed as "2.3756 1.6" with the column spacing collapsed | X(I) in columns 1-10, Y(I) in columns 11-20: X = 2.3756 ... 8.1919, Y = 1.6 ... 2.8 | The READ list is X(I), Y(I). Verified numerically: this order gives 2.3119013 at XIN = 5.0 (the book's 2.3119); the swapped order gives 63.35. The X column is SINH(Y) to four decimals, so the book interpolates the inverse function ASINH. |
+| `output-spacing` | OCR slip | USING ... AMONG 5 VALUES, / AT X= 5.0000 THE FUNCTION HAS VALUE OF 2.3119 | USING LAGRANGIAN POLYNOMIAL INTERPOLATION AMONG 5 VALUES, / AT X = 5.000 THE FUNCTION HAS VALUE OF 2.3119 | The Hollerith counts 49, 8, 8 and 27 are all consistent with their texts, so FORMAT 200 fixes the layout: I3 gives two blanks before 5, F10.3 prints 5.000 (the OCR's 5.0000 is impossible) and F10.4 prints 2.3119. The OCR's blank runs are artifacts; the drivers follow the FORMAT. |
+| `trailing-05-card` | OCR slip | a second card "05" after XIN = 5.0, before ZZZZ | not part of the data card | The program reads N, the N pairs and XIN, prints and calls EXIT, so a further card is never read. It is probably a listing/OCR duplicate or the start of an unrun second data set; uncertain without a scan. The drivers ignore anything after XIN. |
+| `file-extension-and-columns` | OCR slip | polynomial.F90 with ragged label and continuation columns | fixed-form card layout (labels in columns 1-5, continuation marks 1 and 2 in column 6); modern free-form source in lagrange\_interpolation.f90 | The .F90 suffix tells compilers the file is free-form source to be preprocessed, but the listing is fixed-form FORTRAN with C comment cards and job-control cards, so it could not compile under that name. Layout only. |
+| `deck-control-cards` | original quirk | ZZJOB 5 / CSC 001 GERALD, C, F / ZZFORX5 / \*LIST PRINTER / ZZZZ | dropped | Job-control cards of the same monitor as the bisection deck, not FORTRAN; they appear in the printout only because the deck was listed and are not echoed. |
+| `dimension-limit` | modernization | DIMENSION X(10), Y(10) with no check on N | N must be 1 to 10: DEGREE error (DegreeError) before the pairs are read | N above 10 overran the arrays in the original. The catalog form bounds N to 1..10; a card fed directly to the driver gets ERROR,code=DEGREE. |
+| `duplicate-x` | modernization | X(I) = X(J) for I /= J divides by zero at label 9 | INPUT error naming the first equal pair, before any term: X(i) AND X(j) ARE EQUAL | Interpolation needs distinct nodes. The original would divide by zero (a machine stop or garbage); both engines now reject the data with the same message. -0.0 and +0.0 count as equal. |
+| `non-finite-values` | modernization | no check (the original machine had no IEEE infinities or NaN) | a term or the running sum that overflows is an INPUT error after the completed rows | Only possible with extreme or nearly equal X values; the same rule as the other programs' non-finite function values. |
+| `list-directed-input` | modernization | READ 100 / READ 101 with fixed card columns (I2, 2F10.0, F10.0) | list-directed read of N, the N pairs and XIN, in the same order | The printed cards work unchanged and may be typed with any spacing; the engines also check that N equals the number of pairs supplied. |
+| `structured-control-flow` | modernization | IF (I-J) 9,10,9 / 10 CONTINUE / 20 YOUT = YOUT + TERM / CALL EXIT | IF (I /= J) inside DO ... END DO loops; normal termination or STOP with an exit status | The arithmetic IF's two nonzero branches both go to label 9, so a single test is exact. |
+| `truncated-digits` | original quirk | line printer that chops Fw.d digits and prints no leading zero (as in the bisection listing) | book text rendered with RZ rounding and no leading zero | Same deck-control cards as the bisection program, so the same output conventions are assumed. For the book card it makes no difference (5.000 and 2.3119 either way). |
+| `unconfirmed-book-reference` | original quirk | legacy file in chapter\_2/, no scan, no page number | catalog id lagrange\_interpolation with book\_ref\_confirmed = false and no scan\_pdf | The chapter, program number and page in the book are unknown; a confirmed reference can be added later without renaming files (DD1). |
+<!-- ERRATA_TABLE_END -->
 
 ## Precision
 

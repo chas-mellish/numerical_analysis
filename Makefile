@@ -12,6 +12,7 @@
 #   make format                ruff format + ruff check --fix
 #   make e2e                   Playwright browser tests (installs Chromium if needed)
 #   make serve                 run the web learning tool (gerald-na serve)
+#   make readme-index          regenerate the README program index + study-page errata tables
 #   make clean                 remove build output and tool caches (keeps python/.venv)
 #
 # Compiler selection: FC=gfortran (default) or FC=flang. FFLAGS / FFLAGS_TEST override the flag
@@ -56,10 +57,10 @@ INSTALL_PREFIX := ../build
 SINGLE_PREFIX := ../build/single
 
 .PHONY: help build-fortran build-fortran-single build-fortran-flang test-fortran \
-	test-fortran-flang sync test test-parity lint format e2e serve clean
+	test-fortran-flang sync test test-parity lint format e2e serve readme-index clean
 
 help:
-	@sed -n '3,15p' Makefile
+	@sed -n '3,16p' Makefile
 
 build-fortran:
 	cd fortran && $(FPM) build --compiler $(FC) --flag "$(FFLAGS)" $(FPMFLAGS)
@@ -104,6 +105,11 @@ e2e:
 
 serve:
 	$(UV_PY) run gerald-na serve
+
+# Markdown generated from catalog/*.toml (README.md program index, content/*.md errata tables).
+# `make test` fails while these blocks are stale (python/tests/unit/test_generated_docs.py).
+readme-index:
+	$(UV_PY) run gerald-na catalog index --write
 
 clean:
 	rm -rf build fortran/build

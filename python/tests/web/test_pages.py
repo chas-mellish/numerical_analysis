@@ -194,6 +194,21 @@ def test_study_page_renders_tables(client: TestClient) -> None:
     assert "<h2>" in study
 
 
+def test_study_page_drops_generated_block_markers(client: TestClient) -> None:
+    html = client.get(f"/programs/{BISECTION}").text
+    study = html.split('data-testid="study-content"')[1].split("</article>")[0]
+    assert "ERRATA_TABLE" not in study
+    assert "<code>zero-product-branch</code>" in study  # generated errata table rendered
+
+
+def test_render_markdown_keeps_other_comments_escaped() -> None:
+    from gerald_na.web.markdown import render_markdown
+
+    html = str(render_markdown("<!-- PROGRAM_INDEX_START -->\ntext <!-- inline -->\n"))
+    assert "PROGRAM_INDEX_START" not in html
+    assert "&lt;!-- inline --&gt;" in html
+
+
 def test_security_headers(client: TestClient) -> None:
     response = client.get("/")
     assert response.headers["x-content-type-options"] == "nosniff"
