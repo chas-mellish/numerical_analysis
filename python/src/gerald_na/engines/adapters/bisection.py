@@ -34,6 +34,7 @@ class BisectionAdapter(ProgramAdapter):
     program_id: ClassVar[str] = "ch01_p01"
     result_type: ClassVar[type] = BisectionResult
     step_type: ClassVar[type] = BisectionStep
+    parity_outcomes: ClassVar[frozenset[str]] = frozenset({"OK", "BRACKET", "NON_CONVERGENT"})
 
     def run_python(
         self, entry: CatalogEntry, inputs: Mapping[str, InputValue], function: Function | None

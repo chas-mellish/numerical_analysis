@@ -12,22 +12,29 @@ of random inputs within the catalog ``min``/``max`` run through both engines, wh
 
 Inputs are generated per input type from a seed derived from the program id, half of them near
 the book data card (where the iterations are interesting) and half across the full catalog range
-(log-uniform for positive ranges spanning decades, such as tolerances). Programs whose inputs are
-coupled (for example Lagrange's ``n`` and its point count) register a generator in
-``CUSTOM_GENERATORS``. Only the engine-comparison test carries the ``fortran`` marker (skipped
-when the drivers are not built); the generator coverage tests run on the Python engine alone.
+(log-uniform for positive ranges spanning decades, such as tolerances). Everything
+program-specific comes from the program's adapter, never from a program id here: programs whose
+inputs are coupled (for example Lagrange's ``n`` and its point count) override
+``ProgramAdapter.random_inputs``, hand-built edge cases are the adapter's ``parity_cases``, and
+the statuses the generated sets must reach are its ``parity_outcomes``. Programs whose adapter
+adds ``verbose`` extras also compare them with the driver's ``--verbose`` output.
+
+The engine comparisons carry the ``fortran`` marker (skipped when the drivers are not built);
+the generator coverage test runs on the Python engine alone.
 """
 
 import math
 import random
 import zlib
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import fields, is_dataclass
 from typing import Any
 
 import pytest
 
 from gerald_na.engines import FortranRunner, PythonEngine, RunOutcome, RunRequest, diff_outcomes
+from gerald_na.engines.adapters import get_adapter
+from gerald_na.engines.programs import ProgramAdapter
 from gerald_na.registry import CatalogEntry, CatalogInput, get_registry
 from gerald_na.settings import Settings
 
@@ -39,45 +46,6 @@ BOOK_ERROR_CODES = frozenset({"BRACKET", "ZERO_PRODUCT", "NON_CONVERGENT", "ODD_
 """Errors whose message is the book's text, identical on both engines (INPUT messages differ)."""
 
 type Inputs = dict[str, Any]
-type Generator = Callable[[CatalogEntry, random.Random], Inputs]
-
-CUSTOM_GENERATORS: dict[str, Generator] = {}
-"""Program id -> input generator, for programs whose inputs constrain each other."""
-
-
-def bairstow_inputs(entry: CatalogEntry, rng: random.Random) -> Inputs:
-    """ch01_p02: the coefficients above X**N must be zero, so they are drawn with N.
-
-    Mostly valid cards (roots-based or arbitrary coefficients, degree 2..6), plus a few DEGREE
-    cases (N out of range, or a nonzero coefficient above X**N) and tight LIMs.
-    """
-    n = rng.randint(2, 6)
-    if rng.random() < 0.5:
-        roots = [rng.uniform(-6.0, 6.0) for _ in range(n)]
-        poly = [1.0]
-        for root in roots:  # multiply by (x - root)
-            poly = [a - root * b for a, b in zip([*poly, 0.0], [0.0, *poly], strict=True)]
-        lead = rng.choice([1.0, -2.0, 0.5])
-        coefficients = [lead * c for c in poly]
-    else:
-        coefficients = [rng.uniform(-100.0, 100.0) for _ in range(n + 1)]
-    a = [0.0] * (6 - n) + coefficients
-    roll = rng.random()
-    if roll < 0.08:
-        n = rng.choice([0, 1, 7, 12])
-    elif roll < 0.16 and n < 6:
-        a[rng.randint(0, 5 - n)] = rng.uniform(-5.0, 5.0)
-    return {
-        "a": a,
-        "r1": rng.uniform(-3.0, 3.0) if rng.random() < 0.7 else 0.0,
-        "s1": rng.uniform(-3.0, 3.0) if rng.random() < 0.7 else 0.0,
-        "test": float(10.0 ** rng.uniform(-10.0, -2.0)),
-        "lim": rng.choice([rng.randint(1, 8), rng.randint(20, 80)]),
-        "n": n,
-    }
-
-
-CUSTOM_GENERATORS["ch01_p02"] = bairstow_inputs
 
 
 def _bounds(item: CatalogInput, default: float) -> tuple[float, float]:
@@ -129,64 +97,35 @@ def generic_inputs(entry: CatalogEntry, rng: random.Random) -> Inputs:
     return {item.name: _random_value(item, rng, near) for item in entry.inputs}
 
 
-def lagrange_inputs(entry: CatalogEntry, rng: random.Random) -> Inputs:
-    """``lagrange_interpolation``: ``n`` in 1..10 and exactly ``n`` well-spaced pairs.
-
-    Half the sets lie around the book's data (X in [2, 9], Y = ASINH-like values), half anywhere
-    in the catalog range at scales from 1e-2 to 1e5. Nodes are a jittered grid (distinct and
-    well spaced) in random order; XIN ranges a quarter span beyond the nodes (extrapolation).
-    About one set in ten repeats an X value, exercising the INPUT error on both engines.
-    """
-    item = entry.input("points")
-    low, high = _bounds(item, 0.0)
-    n = rng.randint(1, 10)
-    if rng.random() < 0.5:
-        lo, hi = 2.0, 9.0
-    else:
-        span = 10.0 ** rng.uniform(-2.0, 5.0)
-        lo = rng.uniform(low / 2.0, high / 2.0)
-        hi = lo + span
-    h = (hi - lo) / max(n - 1, 1)
-    xs = [lo + (k + rng.uniform(-0.3, 0.3)) * h for k in range(n)]
-    rng.shuffle(xs)
-    scale = 10.0 ** rng.uniform(-1.0, 3.0)
-    ys = [rng.uniform(-scale, scale) for _ in range(n)]
-    if n >= 2 and rng.random() < 0.1:
-        i, j = rng.sample(range(n), 2)
-        xs[j] = xs[i]
-    width = max(hi - lo, 1.0)
-    xin = rng.uniform(lo - width / 4.0, hi + width / 4.0)
-
-    def clamp(value: float) -> float:
-        return float(min(max(value, low), high))
-
-    return {
-        "n": n,
-        "points": [[clamp(x), clamp(y)] for x, y in zip(xs, ys, strict=True)],
-        "xin": clamp(xin),
-    }
-
-
-CUSTOM_GENERATORS["lagrange_interpolation"] = lagrange_inputs
-
-
 def input_sets(entry: CatalogEntry) -> Iterator[tuple[str, Inputs]]:
-    """The data card and ``RANDOM_CASES`` reproducible random input sets."""
+    """The data card, the adapter's parity cases and ``RANDOM_CASES`` reproducible random sets."""
+    adapter = get_adapter(entry.id)
     yield "card", dict(entry.data_card.values)
+    for label, inputs in adapter.parity_cases.items():
+        yield label, dict(inputs)
     rng = random.Random(zlib.crc32(entry.id.encode()))  # noqa: S311 - reproducible test data
-    generate = CUSTOM_GENERATORS.get(entry.id, generic_inputs)
     for index in range(RANDOM_CASES):
-        yield f"r{index:02d}", generate(entry, rng)
+        generated = adapter.random_inputs(entry, rng)
+        yield f"r{index:02d}", generic_inputs(entry, rng) if generated is None else generated
 
 
-def parity_cases() -> Iterator[Any]:
+def presets_of(entry: CatalogEntry) -> list[int | None]:
+    """Every function preset of ``entry``, or ``[None]`` for a data-only program."""
+    if entry.function.takes_function:
+        return [preset.id for preset in entry.function.presets]
+    return [None]
+
+
+def overrides_verbose_text(entry: CatalogEntry) -> bool:
+    """Whether the adapter of ``entry`` adds ``verbose`` extras on the Python engine."""
+    return type(get_adapter(entry.id)).verbose_text is not ProgramAdapter.verbose_text
+
+
+def parity_cases(*, verbose_only: bool = False) -> Iterator[Any]:
     for entry in get_registry().programs:
-        presets: list[int | None] = (
-            [preset.id for preset in entry.function.presets]
-            if entry.function.takes_function
-            else [None]
-        )
-        for preset in presets:
+        if verbose_only and not overrides_verbose_text(entry):
+            continue
+        for preset in presets_of(entry):
             for label, inputs in input_sets(entry):
                 case_id = f"{entry.id}-p{preset}-{label}" if preset else f"{entry.id}-{label}"
                 yield pytest.param(entry, preset, label, inputs, id=case_id)
@@ -274,28 +213,45 @@ def test_engines_agree(
         assert py.result.book_text(carriage_control=True) == ft.raw_stdout
 
 
-def test_random_inputs_cover_both_outcomes() -> None:
-    """The generated sets exercise successes and error paths, not just one of them."""
-    entry = get_registry().get("ch01_p01")
-    statuses = {
-        PythonEngine().run(entry, RunRequest.for_entry(entry, inputs, preset=preset)).status
-        for preset in (1, 2, 3)
-        for _, inputs in input_sets(entry)
-    }
-    assert "OK" in statuses
-    assert statuses - {"OK"}, statuses
+@pytest.mark.fortran
+@pytest.mark.parametrize(
+    ("entry", "preset", "label", "inputs"), list(parity_cases(verbose_only=True))
+)
+def test_verbose_text_agrees(
+    fortran: FortranRunner,
+    entry: CatalogEntry,
+    preset: int | None,
+    label: str,
+    inputs: Inputs,
+) -> None:
+    """The adapter's ``verbose_text`` equals the driver's ``--verbose`` extras."""
+    if not fortran.is_available(entry):
+        pytest.skip(f"{entry.files.fortran_executable} not built: run `make build-fortran`")
+    request = RunRequest.for_entry(entry, inputs, preset=preset, verbose=True)
+    py = PythonEngine().run(entry, request)
+    ft = fortran.run(entry, request)
+    assert py.status == ft.status, (py.error, ft.error)
+    assert py.book_text == ft.book_text
+    if py.ok:
+        assert py.verbose_text
+        assert py.verbose_text == ft.verbose_text
 
 
-def test_lagrange_random_inputs_cover_both_outcomes() -> None:
-    """Coupled Lagrange inputs: consistent n, mostly successes, some duplicate-X errors."""
-    entry = get_registry().get("lagrange_interpolation")
+@pytest.mark.parametrize("entry", get_registry().programs, ids=lambda entry: entry.id)
+def test_random_inputs_cover_expected_outcomes(entry: CatalogEntry) -> None:
+    """The input sets reach the adapter's ``parity_outcomes`` and the full range of counts."""
+    adapter = get_adapter(entry.id)
     outcomes = [
-        PythonEngine().run(entry, RunRequest.for_entry(entry, inputs))
+        PythonEngine().run(entry, RunRequest.for_entry(entry, inputs, preset=preset))
+        for preset in presets_of(entry)
         for _, inputs in input_sets(entry)
     ]
     statuses = {outcome.status for outcome in outcomes}
-    assert statuses == {"OK", "INPUT"}, statuses
-    assert {outcome.inputs["n"] for outcome in outcomes} >= {1, 10}
+    assert adapter.parity_outcomes <= statuses, statuses
+    for count in adapter.count_inputs:
+        item = entry.input(count)
+        counts = {outcome.inputs[count] for outcome in outcomes}
+        assert {item.min, item.max} <= counts, (item.min, item.max, sorted(counts))
 
 
 @pytest.mark.fortran

@@ -509,8 +509,9 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
 3. Import it in `gerald_na/engines/adapters/__init__.py` and add an instance to `_BUILTIN`.
 4. Run the tests: the golden tests, the parity tests and `test_every_catalog_entry_has_an_adapter`
    pick the new catalog entry up automatically. If the program's inputs constrain each other
-   (Lagrange's `n` and its number of points), register an input generator in
-   `CUSTOM_GENERATORS` of `python/tests/parity/test_parity.py`.
+   (Lagrange's `n` and its number of points), override `ProgramAdapter.random_inputs` and set
+   `parity_outcomes` (the statuses the generated sets must reach; and optionally `parity_cases`,
+   labelled hand-built input sets) on the adapter. The parity tests never name a program id.
 
 ### Program-specific notes
 
@@ -522,8 +523,10 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
   `value` is the number of factors (an integer) with the extra `nudges`. Errors: `NON_CONVERGENT`
   (book FORMAT 24) and `DEGREE` (N outside 2..6 or a nonzero coefficient above X**N).
 * `--verbose` text (true factors X**2 - R X - S and roots) is identical on both engines
-  (`BairstowResult.verbose_text`), checked by `python/tests/parity/test_bairstow_parity.py`.
-  Its parity input generator (`CUSTOM_GENERATORS["ch01_p02"]`) draws the coefficients with N.
+  (`BairstowResult.verbose_text`), checked by the generic `test_verbose_text_agrees` in
+  `python/tests/parity/test_parity.py` (it covers every adapter that overrides `verbose_text`).
+  `BairstowAdapter.random_inputs` draws the coefficients with N, and its `parity_cases` add the
+  `singular` card (x**4 - 16 from R = S = 0: a zero denominator, one nudge).
 * Book text: factor lines use RZ (the book's chopped digits); the echoed coefficients use RN,
   because binary 99.41 would chop to 99.40999.
 * **ch03_p01 (Simpson), the X = 0 seed.** The listing starts its sum with the literal `1.0`, the
@@ -551,7 +554,7 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
   Equal X values (a division by zero in the original) are an `INPUT` error on both engines.
 * The adapter writes the book's card layout (`05`, one pair per line, XIN) and reports
   `n != len(points)` from `input_problems` (keyed by `n`: the web form marks that field and the
-  API lists it in `fields`); the parity generator `lagrange_inputs` draws consistent, well-spaced data.
+  API lists it in `fields`); its `random_inputs` draws consistent, well-spaced parity data.
 * The `interpolant` chart (nodes, curve, and the evaluated point) is sampled by the generic
   chart builder in `gerald_na.web.charts` from the result's nodes.
 

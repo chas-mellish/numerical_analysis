@@ -15,6 +15,7 @@ Both engines therefore return the same result type. See ``docs/architecture.md``
 for the step-by-step recipe of adding a program.
 """
 
+import random
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import fields, is_dataclass
@@ -123,6 +124,12 @@ class ProgramAdapter(ABC):
     (Lagrange: ``{"n": "points"}``). The web form keeps such a field equal to the number of rows
     while the learner adds or removes rows; :meth:`input_problems` still enforces the rule on
     every request."""
+    parity_outcomes: ClassVar[frozenset[str]] = frozenset({"OK"})
+    """Statuses the generated parity input sets must reach on the Python engine (default: only
+    ``OK``); for example Bairstow's ``{"OK", "NON_CONVERGENT", "DEGREE"}``."""
+    parity_cases: ClassVar[Mapping[str, Mapping[str, InputValue]]] = MappingProxyType({})
+    """Extra labelled input sets for the parity tests, ``{label: inputs}`` (default: none), such
+    as a hand-built edge case; inputs not given take their data-card value."""
 
     @abstractmethod
     def run_python(
@@ -150,6 +157,15 @@ class ProgramAdapter(ABC):
         problems = self.input_problems(entry, inputs)
         if problems:
             raise InputError("; ".join(problems.values()))
+
+    def random_inputs(self, entry: CatalogEntry, rng: random.Random) -> dict[str, Any] | None:
+        """One random input set for the parity tests, drawn from ``rng`` (default: ``None``).
+
+        ``None`` means the tests' generic per-input generator (independent values within the
+        catalog ``min``/``max``) suits the program. Programs whose inputs constrain each other
+        (Lagrange's ``n`` and its points, Bairstow's coefficients above X**N) override this.
+        """
+        return None
 
     def substituted_ordinates(self, entry: CatalogEntry, function: Function) -> dict[float, float]:
         """Points where the program uses a fixed value instead of evaluating ``function``.

@@ -36,6 +36,7 @@ class SimpsonAdapter(BookSeededIntegrandAdapter):
     result_type: ClassVar[type] = SimpsonResult
     step_type: ClassVar[type] = SimpsonStep
     book_seed: ClassVar[float] = BOOK_SEED
+    parity_outcomes: ClassVar[frozenset[str]] = frozenset({"OK", "ODD_PANELS"})
 
     def run_python(
         self, entry: CatalogEntry, inputs: Mapping[str, InputValue], function: Function | None
