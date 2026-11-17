@@ -22,7 +22,8 @@ At X = 0 the book function gives exactly DX = H*SINH(H) (about H**2) and DDX = 2
 (about 2 + H**2), so the truncation error of both formulas falls by a factor of 100 per row.
 F(X) = 0 at X = 0, so the second difference FR - 2*FO + FL has no cancellation: DDX stays within
 a few units of the eighth digit of 2 in every precision, and the book's oscillation
-(2.0000999, 2.0000009, 1.9999999 for H = 1E-5..1E-7, then 2.0000000) is round-off of its machine.
+(2.0000999 and 2.0000009 for H = 1E-2 and 1E-3, 1.9999999 for H = 1E-5..1E-7, then 2.0000000)
+is round-off of its machine.
 The first difference FR - FL is a cancellation: its relative size is about 2H, so it loses all
 of its digits once 2H drops below the machine's precision. The book prints DX = 1.0000150E-04
 for H = 1E-2 (true 1.0000167E-04), 9.9995000E-07 for H = 1E-3, 5.0000000E-15 for H = 1E-7 and
