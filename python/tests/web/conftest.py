@@ -1,9 +1,10 @@
-"""Fixtures for the web tests: app clients and a temporary Lagrange-like catalog.
+"""Fixtures for the web tests: app clients and a temporary synthetic catalog.
 
-The real Lagrange program lives on another branch, so ``lagrange_repo`` writes a catalog entry
-with the same shape (no scan, unconfirmed book reference, ``point_list`` input, ``interpolant``
-chart) into a temporary repository. ``lagrange_adapter`` registers a small test adapter for it so
-the point-list form, the run fragment and the chart can be exercised end to end.
+``synthetic_repo`` writes a Lagrange-shaped catalog entry ``synthetic_points`` (no scan,
+unconfirmed book reference, ``point_list`` input, ``interpolant`` chart, missing Fortran files)
+into a temporary repository. Without an adapter it exercises the "no engine adapter yet" paths;
+``synthetic_adapter`` registers a small test adapter for it. The real programs, including
+``lagrange_interpolation``, are tested on the repository catalog in ``test_programs.py``.
 """
 
 from collections.abc import Mapping
@@ -26,7 +27,7 @@ BISECTION = "ch01_p01"
 HX = {"hx-request": "true"}
 
 LAGRANGE_TOML = """
-id = "lagrange_interpolation"
+id = "synthetic_points"
 title = "Lagrangian interpolation"
 method = "Lagrange polynomial"
 summary = "Interpolates y at XIN through n points with the Lagrange form."
@@ -93,10 +94,10 @@ tol_real32 = 1e-5
 [files]
 legacy = ["legacy_code/fortran/chapter_2/lagrange.f90"]
 fortran_module = "fortran/src/lagrange_mod.f90"
-fortran_app = "fortran/app/lagrange_interpolation.f90"
-fortran_executable = "lagrange_interpolation"
+fortran_app = "fortran/app/synthetic_points.f90"
+fortran_executable = "synthetic_points"
 python_callable = "gerald_na.algorithms.lagrange:lagrange"
-study_page = "content/lagrange_interpolation.md"
+study_page = "content/synthetic_points.md"
 
 [chart]
 kind = "interpolant"
@@ -137,7 +138,7 @@ class LagrangeResult:
 class FakeLagrangeAdapter(ProgramAdapter):
     """Test adapter: Lagrange interpolation on the first n points."""
 
-    program_id: ClassVar[str] = "lagrange_interpolation"
+    program_id: ClassVar[str] = "synthetic_points"
     result_type: ClassVar[type] = LagrangeResult
     step_type: ClassVar[type] = LagrangeStep
 
@@ -197,20 +198,18 @@ def no_binaries_client(
 
 
 @pytest.fixture
-def lagrange_repo(tmp_path: Path) -> Path:
-    """A temporary repository whose catalog holds the Lagrange-like entry."""
+def synthetic_repo(tmp_path: Path) -> Path:
+    """A temporary repository whose catalog holds only the synthetic point-list entry."""
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "settings.toml").write_text("", encoding="utf-8")
     (tmp_path / "catalog").mkdir()
-    (tmp_path / "catalog" / "lagrange_interpolation.toml").write_text(
-        LAGRANGE_TOML, encoding="utf-8"
-    )
+    (tmp_path / "catalog" / "synthetic_points.toml").write_text(LAGRANGE_TOML, encoding="utf-8")
     legacy = tmp_path / "legacy_code" / "fortran" / "chapter_2"
     legacy.mkdir(parents=True)
     (legacy / "lagrange.f90").write_text("      PROGRAM LAGRAN\n<b>raw</b>\n", encoding="utf-8")
     content = tmp_path / "content"
     content.mkdir()
-    (content / "lagrange_interpolation.md").write_text(
+    (content / "synthetic_points.md").write_text(
         "# Lagrange\n\n<script>alert(1)</script>\n\n[x](javascript:alert(1))\n",
         encoding="utf-8",
     )
@@ -218,14 +217,14 @@ def lagrange_repo(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def lagrange_client(clean_env: pytest.MonkeyPatch, lagrange_repo: Path) -> TestClient:
-    """The app on the temporary Lagrange-like catalog (no adapter registered)."""
-    settings = make_settings(lagrange_repo)
-    return TestClient(create_app(settings, registry=Registry.load(lagrange_repo)))
+def synthetic_client(clean_env: pytest.MonkeyPatch, synthetic_repo: Path) -> TestClient:
+    """The app on the temporary synthetic catalog (no adapter registered)."""
+    settings = make_settings(synthetic_repo)
+    return TestClient(create_app(settings, registry=Registry.load(synthetic_repo)))
 
 
 @pytest.fixture
-def lagrange_adapter(monkeypatch: pytest.MonkeyPatch) -> FakeLagrangeAdapter:
+def synthetic_adapter(monkeypatch: pytest.MonkeyPatch) -> FakeLagrangeAdapter:
     """Register :class:`FakeLagrangeAdapter` for the duration of the test."""
     adapter = FakeLagrangeAdapter()
     monkeypatch.setitem(adapter_registry._ADAPTERS, adapter.program_id, adapter)

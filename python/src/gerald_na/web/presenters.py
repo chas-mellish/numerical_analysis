@@ -13,7 +13,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, fields, is_dataclass
 from typing import Any, Literal
 
-from gerald_na.engines import CompareReport, RunOutcome
+from gerald_na.engines import CompareReport, RunOutcome, get_adapter
 from gerald_na.engines.base import step_to_dict
 from gerald_na.engines.python import compile_function
 from gerald_na.errors import ExpressionError, GeraldNAError
@@ -215,10 +215,30 @@ def _table(
 
 
 def _function(entry: CatalogEntry, outcome: RunOutcome) -> Callable[[float], float] | None:
+    """F(x) for the charts, evaluated the way the program does.
+
+    Points where the program substitutes a value (Simpson's and Romberg's book seed F(0) = 1
+    for SIN(X)/X, :meth:`~gerald_na.engines.programs.ProgramAdapter.substituted_ordinates`)
+    return that value instead of evaluating the expression.
+    """
     try:
-        return compile_function(entry, outcome.preset, outcome.expression)
+        function = compile_function(entry, outcome.preset, outcome.expression)
     except ExpressionError, GeraldNAError, KeyError:
         return None
+    if function is None:
+        return None
+    try:
+        fixed = get_adapter(entry.id).substituted_ordinates(entry, function)
+    except GeraldNAError:
+        fixed = {}
+    if not fixed:
+        return function
+    compiled = function
+
+    def substituted(x: float) -> float:
+        return fixed[x] if x in fixed else compiled(x)
+
+    return substituted
 
 
 def figures_for(entry: CatalogEntry, outcome: RunOutcome) -> list[Figure]:

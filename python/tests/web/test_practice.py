@@ -63,15 +63,15 @@ def test_fortran_answer_shown_when_available(client: TestClient) -> None:
     assert 'data-testid="practice-computed-fortran"' in html
 
 
-def test_practice_without_engine(lagrange_client: TestClient) -> None:
-    status, html = check(lagrange_client, "value-at-3", "9", "lagrange_interpolation")
+def test_practice_without_engine(synthetic_client: TestClient) -> None:
+    status, html = check(synthetic_client, "value-at-3", "9", "synthetic_points")
     assert status == 200
     assert 'data-correct="unknown"' in html
     assert "could not be computed" in html
 
 
-def test_practice_with_point_list(lagrange_client: TestClient, lagrange_adapter: object) -> None:
-    status, html = check(lagrange_client, "value-at-3", "9.0000001", "lagrange_interpolation")
+def test_practice_with_point_list(synthetic_client: TestClient, synthetic_adapter: object) -> None:
+    status, html = check(synthetic_client, "value-at-3", "9.0000001", "synthetic_points")
     assert status == 200
     assert 'data-correct="true"' in html
 

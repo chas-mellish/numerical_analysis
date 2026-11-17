@@ -201,7 +201,7 @@ def test_engine_unavailable_is_503(no_binaries_client: TestClient) -> None:
         assert "ENGINE_UNAVAILABLE" in response.text
 
 
-def test_point_list_program_runs(lagrange_client: TestClient, lagrange_adapter: object) -> None:
+def test_point_list_program_runs(synthetic_client: TestClient, synthetic_adapter: object) -> None:
     form = {
         "in_n": "4",
         "in_points.x": ["1", "2", "4", "5"],
@@ -209,7 +209,7 @@ def test_point_list_program_runs(lagrange_client: TestClient, lagrange_adapter: 
         "in_xin": "3.",
         "engine": "python",
     }
-    response = lagrange_client.post("/programs/lagrange_interpolation/run", data=form, headers=HX)
+    response = synthetic_client.post("/programs/synthetic_points/run", data=form, headers=HX)
     assert response.status_code == 200, response.text
     html = response.text
     assert html.count('data-testid="step-row"') == 4
@@ -219,7 +219,7 @@ def test_point_list_program_runs(lagrange_client: TestClient, lagrange_adapter: 
     assert [figure["id"] for figure in figures] == ["interpolant"]
 
 
-def test_point_list_validation(lagrange_client: TestClient, lagrange_adapter: object) -> None:
+def test_point_list_validation(synthetic_client: TestClient, synthetic_adapter: object) -> None:
     form = {
         "in_n": "3",
         "in_points.x": ["1", "2", "x"],
@@ -227,7 +227,7 @@ def test_point_list_validation(lagrange_client: TestClient, lagrange_adapter: ob
         "in_xin": "500",
         "engine": "python",
     }
-    response = lagrange_client.post("/programs/lagrange_interpolation/run", data=form, headers=HX)
+    response = synthetic_client.post("/programs/synthetic_points/run", data=form, headers=HX)
     assert response.status_code == 422
     assert 'data-testid="field-error-points"' in response.text
     assert "entry 3" in response.text

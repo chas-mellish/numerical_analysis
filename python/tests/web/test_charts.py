@@ -253,3 +253,77 @@ def test_unknown_kind_and_json_safe() -> None:
     assert json_safe({"a": (math.nan, math.inf, 1.5, 2j, {3})}) == {
         "a": [None, None, 1.5, {"re": 0.0, "im": 2.0}, [3]]
     }
+
+
+@dataclass(frozen=True)
+class CoefficientFactor:
+    """The shape of ``gerald_na.algorithms.bairstow.BairstowFactor``."""
+
+    kind: str
+    coefficients: tuple[float, ...]
+
+
+def test_factors_from_coefficient_lists_with_delta_and_polynomial() -> None:
+    factors = [
+        CoefficientFactor("quadratic", (4.2, -2.1)),
+        {"kind": "quadratic", "coefficients": [3.3, -6.2]},
+        CoefficientFactor("linear", (1.0, -10.3)),
+        {"kind": "linear", "coefficients": [1.0]},  # wrong length: ignored
+    ]
+    data = ChartInput(
+        kind="factors",
+        options={
+            "poly_input": "a",
+            "show_polynomial": True,
+            "delta_keys": ["delr", "dels"],
+            "quadratic_form": "x^2 - r x - s",
+        },
+        steps=BAIRSTOW_STEPS,
+        result={"value": 3, "factors": factors},
+        inputs={"a": BAIRSTOW_COEFFS},
+        labels={"delr": "DELR", "dels": "DELS"},
+    )
+    ids = [figure["id"] for figure in build_figures(data)]
+    assert ids == ["factors_r", "factors_s", "factors_delta", "factors_roots", "factors_polynomial"]
+    _, _, delta, roots, polynomial = build_figures(data)
+    sizes = by_name(delta, "factor 1")["y"]
+    assert sizes[-1] == pytest.approx(0.3)
+    assert delta["layout"]["yaxis"]["type"] == "log"
+    found = by_name(roots, "roots from the factors")
+    assert sum(found["x"]) == pytest.approx(17.8)
+    real = by_name(polynomial, "real roots from the factors")
+    assert sorted(real["x"]) == pytest.approx([0.5801316, 3.6198684, 10.3], abs=1e-6)
+    curve = by_name(polynomial, "P(x)")
+    assert min(curve["x"]) < 0.58 < 10.3 < max(curve["x"])
+
+
+def test_delta_figure_linear_scale_keeps_zero() -> None:
+    steps = [{"factor": 1, "k": 1, "r": 0.0, "s": 0.0, "delr": 0.0, "dels": 0.0}]
+    data = ChartInput(
+        kind="factors", options={"delta_keys": ["delr", "dels"], "log_delta": False}, steps=steps
+    )
+    delta = build_figures(data)[2]
+    assert by_name(delta, "factor 1")["y"] == [0.0]
+    assert "type" not in delta["layout"]["yaxis"]
+
+
+def test_axis_label_and_sample_options() -> None:
+    heatmap = build_figures(
+        ChartInput(
+            kind="romberg_heatmap",
+            options={"row_label": "Line L", "column_label": "Extrapolation order"},
+            result={"value": 1.0, "table": [[1.0], [1.0, 1.0]]},
+        )
+    )[0]
+    assert heatmap["layout"]["xaxis"]["title"]["text"] == "Extrapolation order"
+    assert heatmap["layout"]["yaxis"]["title"]["text"] == "Line L"
+    interpolant = build_figures(
+        ChartInput(
+            kind="interpolant",
+            options={"samples": 11, "x_label": "X", "y_label": "Y"},
+            result={"value": 2.0},
+            inputs={"points": [[0.0, 0.0], [1.0, 1.0]], "xin": 2.0},
+        )
+    )[0]
+    assert len(by_name(interpolant, "Lagrange polynomial")["x"]) == 11
+    assert interpolant["layout"]["yaxis"]["title"]["text"] == "Y"

@@ -15,8 +15,8 @@ What each kind reads (option defaults in brackets; see ``docs/architecture.md``)
 * ``abs_residual`` -- |steps[``residual_key`` [fx]]| against ``index_key`` [k], log scale unless
   ``log_residual = false``.
 * ``romberg_heatmap`` -- result field ``table_field`` [table]: a ragged list of rows as printed
-  (row i, column j). Colour = log10 |cell - result value| (``color = "value"`` colours by the
-  cell itself); the text of each cell is its value.
+  (row i, column j; axis titles ``row_label`` / ``column_label``). Colour = log10 |cell - result
+  value| (``color = "value"`` colours by the cell itself); the text of each cell is its value.
 * ``integrand_panels`` -- F sampled on a fine grid over [``a`` (number, or input ``lower_input``)
   [0], input ``upper_input`` [b]] plus the ordinates of the steps ``x_key`` [x], ``y_key`` [fx]
   (``weight_key`` [weight] shown in the hover when present).
@@ -25,12 +25,17 @@ What each kind reads (option defaults in brackets; see ``docs/architecture.md``)
   the complex plane. Roots come from result ``roots_field`` [roots] (complex numbers, [re, im]
   pairs or {re, im} dicts) or else from result ``factors_field`` [factors], a list of dicts or
   dataclasses with ``kind`` = quadratic (``r``, ``s``; ``quadratic_form`` ["x^2 - r x - s"] or
-  "x^2 + r x + s"), final_quadratic (``a2``, ``a1``, ``a0``) or linear (``a1``, ``a0``). With
-  ``poly_input`` (a real_list input, highest power first) the polynomial's own roots are added as
-  a reference.
+  "x^2 + r x + s"), final_quadratic (``a2``, ``a1``, ``a0``) or linear (``a1``, ``a0``); the
+  coefficients may also come as one ``coefficients`` list in that order (``BairstowFactor``).
+  With ``poly_input`` (a real_list input, highest power first) the polynomial's own roots are
+  added as a reference. With ``delta_keys`` (e.g. ["delr", "dels"]) a ``factors_delta`` figure
+  shows the sum of their absolute values per iteration (log scale unless ``log_delta = false``);
+  with ``poly_input`` and ``show_polynomial = true`` a ``factors_polynomial`` figure draws P(x)
+  with the real roots from the factors marked.
 * ``interpolant`` -- the nodes of input ``points_input`` [points] (only the first
   ``count_input`` [n] when that input exists), the Lagrange polynomial through them, and the
-  evaluated point (input ``x_input`` [xin], result ``value``).
+  evaluated point (input ``x_input`` [xin], result ``value``); ``samples`` [400] curve points,
+  axis titles ``x_label`` [x] and ``y_label`` [y].
 """
 
 import cmath
@@ -304,7 +309,11 @@ def romberg_heatmap_figures(data: ChartInput) -> list[Figure]:
         + "<extra></extra>",
     }
     title = "Romberg table" + ("" if by_value else " (colour: distance from the result)")
-    layout = _layout(title, "column j", "row i")
+    layout = _layout(
+        title,
+        str(data.option("column_label", "column j")),
+        str(data.option("row_label", "row i")),
+    )
     layout["yaxis"]["autorange"] = "reversed"
     layout["xaxis"]["dtick"] = 1
     layout["yaxis"]["dtick"] = 1
@@ -421,6 +430,24 @@ def _root(item: object) -> complex | None:
     return None
 
 
+_COEFFICIENT_NAMES: Mapping[str, tuple[str, ...]] = {
+    "quadratic": ("r", "s"),
+    "final_quadratic": ("a2", "a1", "a0"),
+    "linear": ("a1", "a0"),
+}
+
+
+def _with_named_coefficients(mapping: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Expand ``{kind, coefficients: [...]}`` (``BairstowFactor``) into named keys."""
+    names = _COEFFICIENT_NAMES.get(str(mapping.get("kind", "")))
+    values = mapping.get("coefficients")
+    if names is None or not isinstance(values, Sequence) or isinstance(values, str):
+        return mapping
+    if len(values) != len(names):
+        return mapping
+    return {**mapping, **dict(zip(names, values, strict=True))}
+
+
 def factor_roots(factors: Sequence[object], quadratic_form: str) -> list[complex]:
     """Roots of Bairstow factor records (see the module docstring for the accepted shapes)."""
     roots: list[complex] = []
@@ -429,6 +456,7 @@ def factor_roots(factors: Sequence[object], quadratic_form: str) -> list[complex
         mapping = _as_mapping(item)
         if mapping is None:
             continue
+        mapping = _with_named_coefficients(mapping)
         r, s = _number(mapping.get("r")), _number(mapping.get("s"))
         a2, a1, a0 = (_number(mapping.get(k)) for k in ("a2", "a1", "a0"))
         kind = str(mapping.get("kind", ""))
@@ -475,6 +503,40 @@ def polynomial_roots(coefficients: Sequence[float], iterations: int = 500) -> li
     return roots
 
 
+def _delta_figure(
+    data: ChartInput,
+    groups: Mapping[object, Sequence[Mapping[str, Any]]],
+    keys: Sequence[str],
+    index_key: str,
+) -> Figure:
+    """Sum of |corrections| (e.g. |DELR| + |DELS|) per iteration, by factor."""
+    log = bool(data.option("log_delta", True))
+    label = " + ".join(f"|{data.label(key)}|" for key in keys)
+    traces = []
+    for slot, (group, rows) in enumerate(groups.items()):
+        sizes: list[float | None] = []
+        for row in rows:
+            parts = [_number(row.get(key)) for key in keys]
+            total = None if any(p is None for p in parts) else sum(abs(p or 0.0) for p in parts)
+            sizes.append(None if total is None or (log and total == 0.0) else total)
+        traces.append(
+            _line(
+                f"factor {group}",
+                _column(rows, index_key),
+                sizes,
+                slot,
+                hovertemplate=f"factor {group}, iteration %{{x}}<br>{label} = %{{y:.3e}}"
+                "<extra></extra>",
+            )
+        )
+    title = f"{label} per iteration, by factor" + (" (log scale)" if log else "")
+    layout = _layout(title, "iteration within factor", label)
+    if log:
+        layout["yaxis"]["type"] = "log"
+        layout["yaxis"]["exponentformat"] = "power"
+    return _figure("factors_delta", title, traces, layout)
+
+
 def factors_figures(data: ChartInput) -> list[Figure]:
     """r and s per iteration for each factor, and the roots on the complex plane."""
     group_key = str(data.option("group_key", "factor"))
@@ -504,6 +566,9 @@ def factors_figures(data: ChartInput) -> list[Figure]:
                 _layout(title, "iteration within factor", data.label(coefficient)),
             )
         )
+    delta_keys = data.option("delta_keys", None)
+    if isinstance(delta_keys, Sequence) and not isinstance(delta_keys, str) and delta_keys:
+        figures.append(_delta_figure(data, groups, [str(key) for key in delta_keys], index_key))
     result = data.result or {}
     roots: list[complex] = []
     raw_roots = result.get(str(data.option("roots_field", "roots")))
@@ -525,6 +590,7 @@ def factors_figures(data: ChartInput) -> list[Figure]:
         }
     ]
     poly_input = data.option("poly_input", None)
+    numbers: list[float] = []
     if poly_input is not None:
         coefficients = data.inputs.get(str(poly_input))
         if isinstance(coefficients, Sequence) and not isinstance(coefficients, str):
@@ -551,7 +617,48 @@ def factors_figures(data: ChartInput) -> list[Figure]:
     layout["yaxis"]["zeroline"] = True
     layout["xaxis"]["zeroline"] = True
     figures.append(_figure("factors_roots", title, root_traces, layout))
+    if numbers and bool(data.option("show_polynomial", False)):
+        figures.append(_polynomial_figure(numbers, roots))
     return figures
+
+
+def _polynomial_figure(coefficients: Sequence[float], roots: Sequence[complex]) -> Figure:
+    """P(x) (coefficients highest power first) over its real roots, which are marked."""
+    real_roots = [root.real for root in roots if abs(root.imag) <= 1e-9 * max(1.0, abs(root))]
+    span = [root.real for root in roots] or [-1.0, 1.0]
+    lo, hi = min(span), max(span)
+    pad = max(0.1 * (hi - lo), 0.5)
+
+    def value(x: float) -> float:
+        total = 0.0
+        for c in coefficients:
+            total = total * x + c
+        return total
+
+    grid_x, grid_y = _sample(value, lo - pad, hi + pad)
+    traces = [
+        _line(
+            "P(x)",
+            grid_x,
+            grid_y,
+            0,
+            mode="lines",
+            hovertemplate="x = %{x:.6g}<br>P(x) = %{y:.8g}<extra></extra>",
+        ),
+        {
+            "type": "scatter",
+            "mode": "markers",
+            "name": "real roots from the factors",
+            "x": real_roots,
+            "y": [0.0 for _ in real_roots],
+            "marker": {"color": SERIES[1], "size": 10, "line": {"color": SURFACE, "width": 2}},
+            "hovertemplate": "root %{x:.8g}<extra></extra>",
+        },
+    ]
+    title = "The polynomial and its real roots"
+    layout = _layout(title, "x", "P(x)")
+    layout["yaxis"]["zeroline"] = True
+    return _figure("factors_polynomial", title, traces, layout)
 
 
 def _lagrange(nodes: Sequence[tuple[float, float]], x: float) -> float:
@@ -585,7 +692,11 @@ def interpolant_figures(data: ChartInput) -> list[Figure]:
         xs = [x for x, _ in nodes] + ([x_in] if x_in is not None else [])
         lo, hi = min(xs), max(xs)
         pad = 0.05 * (hi - lo)
-        grid_x, grid_y = _sample(lambda t: _lagrange(nodes, t), lo - pad, hi + pad)
+        samples = _number(data.option("samples", GRID_POINTS))
+        n_samples = int(samples) if samples is not None and 2 <= samples <= 10 * GRID_POINTS else 0
+        grid_x, grid_y = _sample(
+            lambda t: _lagrange(nodes, t), lo - pad, hi + pad, n_samples or GRID_POINTS
+        )
         traces.append(
             _line(
                 "Lagrange polynomial",
@@ -620,7 +731,8 @@ def interpolant_figures(data: ChartInput) -> list[Figure]:
             }
         )
     title = "Interpolating polynomial"
-    return [_figure("interpolant", title, traces, _layout(title, "x", "y"))]
+    layout = _layout(title, str(data.option("x_label", "x")), str(data.option("y_label", "y")))
+    return [_figure("interpolant", title, traces, layout)]
 
 
 CHART_BUILDERS: Mapping[str, Callable[[ChartInput], list[Figure]]] = {

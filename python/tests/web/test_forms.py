@@ -98,11 +98,11 @@ def test_parse_run_form_custom_expression() -> None:
     assert parsed.engine == "python"
 
 
-def test_lists_and_points(lagrange_repo: object) -> None:
+def test_lists_and_points(synthetic_repo: object) -> None:
     from pathlib import Path
 
-    assert isinstance(lagrange_repo, Path)
-    entry = Registry.load(lagrange_repo).get("lagrange_interpolation")
+    assert isinstance(synthetic_repo, Path)
+    entry = Registry.load(synthetic_repo).get("synthetic_points")
     values = default_form_values(entry)
     assert values.points["points"] == [("1.0", "1.0"), ("2.0", "4.0"), ("4.0", "16.0")]
     assert values.function == ""

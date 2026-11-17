@@ -71,12 +71,12 @@ def test_program_detail_unknown(client: TestClient) -> None:
     assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
-def test_unconfirmed_program_detail(lagrange_client: TestClient) -> None:
-    data = lagrange_client.get("/api/programs/lagrange_interpolation").json()
+def test_unconfirmed_program_detail(synthetic_client: TestClient) -> None:
+    data = synthetic_client.get("/api/programs/synthetic_points").json()
     assert data["book_ref_confirmed"] is False
     assert data["files"]["scan"] is None
     assert data["scan_available"] is False
-    listing = lagrange_client.get("/api/programs").json()
+    listing = synthetic_client.get("/api/programs").json()
     assert listing[0]["confirmed"] is False
     assert listing[0]["engines"] == []
 
@@ -190,19 +190,19 @@ def test_run_engine_disabled_is_503(python_only_client: TestClient) -> None:
     assert "disabled" in response.json()["error"]["message"]
 
 
-def test_run_without_adapter_is_503(lagrange_client: TestClient) -> None:
-    response = run(lagrange_client, {}, "lagrange_interpolation")
+def test_run_without_adapter_is_503(synthetic_client: TestClient) -> None:
+    response = run(synthetic_client, {}, "synthetic_points")
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "ENGINE_UNAVAILABLE"
 
 
-def test_run_point_list(lagrange_client: TestClient, lagrange_adapter: object) -> None:
+def test_run_point_list(synthetic_client: TestClient, synthetic_adapter: object) -> None:
     data = run(
-        lagrange_client, {"inputs": {"points": [[0, 0], [1, 1], [2, 4]]}}, "lagrange_interpolation"
+        synthetic_client, {"inputs": {"points": [[0, 0], [1, 1], [2, 4]]}}, "synthetic_points"
     ).json()
     assert data["ok"]
     assert data["result"]["value"] == pytest.approx(9.0)
-    error = run(lagrange_client, {"expression": "x"}, "lagrange_interpolation").json()["error"]
+    error = run(synthetic_client, {"expression": "x"}, "synthetic_points").json()["error"]
     assert error["code"] == "INPUT"
 
 

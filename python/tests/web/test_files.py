@@ -64,9 +64,9 @@ def test_everything_else_is_404(client: TestClient, url: str) -> None:
     assert response.status_code == 404, url
 
 
-def test_missing_scan_and_missing_files(lagrange_client: TestClient) -> None:
-    assert lagrange_client.get("/files/lagrange_interpolation/scan").status_code == 404
-    assert lagrange_client.get("/files/lagrange_interpolation/fortran_module").status_code == 404
-    response = lagrange_client.get("/files/lagrange_interpolation/legacy")
+def test_missing_scan_and_missing_files(synthetic_client: TestClient) -> None:
+    assert synthetic_client.get("/files/synthetic_points/scan").status_code == 404
+    assert synthetic_client.get("/files/synthetic_points/fortran_module").status_code == 404
+    response = synthetic_client.get("/files/synthetic_points/legacy")
     assert response.status_code == 200
     assert "PROGRAM LAGRAN" in response.text

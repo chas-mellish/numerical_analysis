@@ -260,7 +260,8 @@ class WebState:
 
         ``inputs`` must hold every catalog input (merge the book card first if needed).
         Raises :class:`InputError` subclasses: unknown mode, :class:`CustomFunctionEngineError`,
-        :class:`FieldErrors`, :class:`~gerald_na.errors.ExpressionError`.
+        :class:`FieldErrors` (per-input problems, then the adapter's cross-input
+        ``input_problems``), :class:`~gerald_na.errors.ExpressionError`.
         """
         if mode not in RUN_MODES:
             raise InputError(f"unknown engine {mode!r} (choose from {', '.join(RUN_MODES)})")
@@ -280,7 +281,12 @@ class WebState:
             )
         except ValueError as exc:  # pydantic: preset and expression together, bad preset
             raise InputError(str(exc).splitlines()[0]) from None
-        validate_request(entry, request)  # unknown preset, function for a data-only program
+        coerced, _ = validate_request(entry, request)  # unknown preset, data-only program
+        if self.has_adapter(entry):
+            # cross-input rules (Lagrange: n must equal the number of points), keyed by field
+            cross = get_adapter(entry.id).input_problems(entry, coerced)
+            if cross:
+                raise FieldErrors(cross)
         if expression is not None:
             compile_expr(expression)  # ExpressionError with position
         return request

@@ -4,6 +4,7 @@ import re
 
 import pytest
 from fastapi.testclient import TestClient
+from markupsafe import escape
 
 from gerald_na.registry import get_registry
 from tests.web.conftest import BISECTION
@@ -73,18 +74,18 @@ def test_home_lists_programs_by_chapter(client: TestClient) -> None:
     for entry in get_registry().programs:
         assert has_testid(html, f"program-link-{entry.id}")
         assert f'href="/programs/{entry.id}"' in html
-        assert entry.title in html
+        assert str(escape(entry.title)) in html
     assert "Chapter 1, Program 1, page 24" in html
     assert 'data-testid="scan-status-ch01_p01" data-scan="available"' in html
 
 
-def test_home_groups_unconfirmed_references(lagrange_client: TestClient) -> None:
-    html = lagrange_client.get("/").text
+def test_home_groups_unconfirmed_references(synthetic_client: TestClient) -> None:
+    html = synthetic_client.get("/").text
     assert has_testid(html, "chapter-unconfirmed")
     assert "Book reference unconfirmed" in html
-    assert has_testid(html, "program-link-lagrange_interpolation")
-    assert has_testid(html, "unconfirmed-badge-lagrange_interpolation")
-    assert 'data-testid="scan-status-lagrange_interpolation" data-scan="missing"' in html
+    assert has_testid(html, "program-link-synthetic_points")
+    assert has_testid(html, "unconfirmed-badge-synthetic_points")
+    assert 'data-testid="scan-status-synthetic_points" data-scan="missing"' in html
 
 
 def test_program_page_has_every_testid(client: TestClient) -> None:
@@ -154,8 +155,8 @@ def test_unknown_program_page_is_404(client: TestClient) -> None:
     assert client.post("/programs/ch99_p99/run", data={}).status_code == 404
 
 
-def test_lagrange_like_page_shows_scan_missing(lagrange_client: TestClient) -> None:
-    response = lagrange_client.get("/programs/lagrange_interpolation")
+def test_synthetic_page_shows_scan_missing(synthetic_client: TestClient) -> None:
+    response = synthetic_client.get("/programs/synthetic_points")
     assert response.status_code == 200
     html = response.text
     assert has_testid(html, "scan-missing")
@@ -177,8 +178,8 @@ def test_lagrange_like_page_shows_scan_missing(lagrange_client: TestClient) -> N
     assert "&lt;b&gt;raw&lt;/b&gt;" in html
 
 
-def test_study_page_markdown_is_safe(lagrange_client: TestClient) -> None:
-    html = lagrange_client.get("/programs/lagrange_interpolation").text
+def test_study_page_markdown_is_safe(synthetic_client: TestClient) -> None:
+    html = synthetic_client.get("/programs/synthetic_points").text
     study = html.split('data-testid="study-content"')[1].split("</article>")[0]
     assert "<h1>Lagrange</h1>" in study
     assert "<script>" not in study
