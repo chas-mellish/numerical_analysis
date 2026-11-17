@@ -95,6 +95,7 @@ def _form_context(
         "values": values if values is not None else default_form_values(entry),
         "engines": state.engine_statuses(entry),
         "custom_function": CUSTOM_FUNCTION,
+        "count_inputs": state.count_inputs(entry),
     }
 
 

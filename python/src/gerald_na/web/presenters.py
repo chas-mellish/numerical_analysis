@@ -4,14 +4,16 @@ Everything here is generic over catalog programs. The iteration table comes from
 ``trace.step_columns`` (cells formatted with the column's Fortran edit descriptor, the full value
 in the tooltip). The "result details" are every field of the result dataclass other than
 ``value``, ``converged``, ``iterations`` and ``steps``, rendered by shape: scalars, number lists,
-ragged tables (Romberg's triangle), and lists of records (Bairstow's factors).
+ragged tables (Romberg's triangle), lists of records, and lists of records with named
+coefficients (Bairstow's factors: one group of named rows per factor, ``r``/``s`` for a quadratic,
+``a2``/``a1``/``a0`` for the final quadratic, ``a1``/``a0`` for the linear factor).
 """
 
 import math
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, fields, is_dataclass
-from typing import Any, Literal
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from gerald_na.engines import CompareReport, RunOutcome, get_adapter
 from gerald_na.engines.base import step_to_dict
@@ -24,6 +26,8 @@ __all__ = [
     "CellView",
     "CompareView",
     "ExtraView",
+    "NamedRecord",
+    "NamedRecordView",
     "OutcomeView",
     "TableView",
     "compare_view",
@@ -91,17 +95,41 @@ class TableView:
     rows: list[list[CellView]]
 
 
+@runtime_checkable
+class NamedRecord(Protocol):
+    """A result record whose coefficients have names (``BairstowFactor``)."""
+
+    @property
+    def kind(self) -> str: ...
+
+    @property
+    def form(self) -> str: ...
+
+    def named_coefficients(self) -> Mapping[str, float]: ...
+
+
+@dataclass
+class NamedRecordView:
+    """One named record: its kind, a readable label, its printed form and named values."""
+
+    kind: str
+    label: str
+    form: str
+    fields: list[tuple[str, str]]
+
+
 @dataclass
 class ExtraView:
     """One extra result field, rendered according to its shape."""
 
     name: str
-    kind: Literal["scalar", "numbers", "matrix", "records"]
+    kind: Literal["scalar", "numbers", "matrix", "records", "named_records"]
     text: str = ""
     values: list[str] = field(default_factory=list)
     matrix: list[list[str]] = field(default_factory=list)
     columns: list[str] = field(default_factory=list)
     records: list[list[str]] = field(default_factory=list)
+    named: list[NamedRecordView] = field(default_factory=list)
 
 
 @dataclass
@@ -156,6 +184,15 @@ def _is_number(value: object) -> bool:
     return isinstance(value, int | float | complex) and not isinstance(value, bool)
 
 
+def _named(item: NamedRecord) -> NamedRecordView:
+    return NamedRecordView(
+        kind=item.kind,
+        label=item.kind.replace("_", " "),
+        form=item.form,
+        fields=[(key, format_value(value)) for key, value in item.named_coefficients().items()],
+    )
+
+
 def _extra(name: str, value: object) -> ExtraView:
     if isinstance(value, list | tuple):
         items = list(value)
@@ -169,6 +206,8 @@ def _extra(name: str, value: object) -> ExtraView:
                 "matrix",
                 matrix=[[format_value(cell) for cell in row] for row in items],
             )
+        if items and all(isinstance(item, NamedRecord) for item in items):
+            return ExtraView(name, "named_records", named=[_named(item) for item in items])
         mappings = [_as_mapping(item) for item in items]
         if items and all(mapping is not None for mapping in mappings):
             columns: list[str] = []

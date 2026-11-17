@@ -310,6 +310,55 @@ def test_bairstow_factor_roots_match_the_polynomial(client: TestClient, engine: 
     assert sorted(polynomial["data"][1]["x"]) == pytest.approx([0.58013, 3.61987, 10.3], abs=1e-4)
 
 
+def _cell(html: str, testid: str) -> str:
+    match = re.search(
+        rf'data-testid="{re.escape(testid)}"><th scope="row">[^<]*</th><td>([^<]*)<', html
+    )
+    assert match is not None, testid
+    return match.group(1)
+
+
+@pytest.mark.parametrize("engine", ["python", pytest.param("fortran", marks=pytest.mark.fortran)])
+def test_bairstow_result_details_name_each_factor_coefficient(
+    client: TestClient, engine: str
+) -> None:
+    html = run_html(client, BAIRSTOW, book_form(BAIRSTOW, engine))
+    table = html.split('data-testid="extra-table-factors"')[1].split("</table>")[0]
+    assert re.findall(r'data-testid="extra-factors-(\d)" data-kind="([a-z_]+)"', table) == [
+        ("0", "quadratic"),
+        ("1", "quadratic"),
+        ("2", "linear"),
+    ]
+    assert "1. quadratic <code>X**2 + R X + S</code>" in table
+    assert "3. linear <code>A1 X + A0</code>" in table
+    expected = {
+        "extra-factors-0-r": 4.2,
+        "extra-factors-0-s": -2.1,
+        "extra-factors-1-r": 3.3,
+        "extra-factors-1-s": -6.2,
+        "extra-factors-2-a1": 1.0,
+        "extra-factors-2-a0": -10.3,
+    }
+    for testid, value in expected.items():
+        assert float(_cell(table, testid)) == pytest.approx(value, abs=1e-6), testid
+    assert "coefficients" not in table  # no raw tuple column
+    assert not has_testid(table, "extra-factors-2-r")
+
+
+def test_bairstow_result_details_final_quadratic_names_a2_a1_a0(client: TestClient) -> None:
+    form = book_form(BAIRSTOW)
+    # (x**2 - 4.2x + 2.1)(x**2 - 3.3x + 6.2): degree 4 ends with a final quadratic
+    form["in_a"] = ["0", "0", "1", "-7.5", "22.16", "-32.97", "13.02"]
+    form["in_n"] = "4"
+    html = run_html(client, BAIRSTOW, form)
+    table = html.split('data-testid="extra-table-factors"')[1].split("</table>")[0]
+    assert 'data-testid="extra-factors-1" data-kind="final_quadratic"' in table
+    assert "2. final quadratic <code>A2 X**2 + A1 X + A0</code>" in table
+    assert float(_cell(table, "extra-factors-1-a2")) == pytest.approx(1.0)
+    assert float(_cell(table, "extra-factors-1-a1")) == pytest.approx(-3.3, abs=1e-6)
+    assert float(_cell(table, "extra-factors-1-a0")) == pytest.approx(6.2, abs=1e-6)
+
+
 def test_bairstow_api_serializes_factors(client: TestClient) -> None:
     data = client.post("/api/programs/ch01_p02/run", json={"engine": "python"}).json()
     factors = data["result"]["factors"]
@@ -416,6 +465,25 @@ def test_lagrange_added_point_with_matching_n(client: TestClient, engine: str) -
     assert point["x"] == [5.0]
     assert point["y"] == [float(result_value(html))]
     assert interpolant["layout"]["xaxis"]["title"]["text"] == "X"
+
+
+def test_lagrange_n_is_marked_as_the_count_of_points(client: TestClient) -> None:
+    html = client.get("/programs/lagrange_interpolation").text
+    match = re.search(r'<input[^>]*data-testid="input-n"[^>]*>', html, re.S)
+    assert match is not None
+    assert 'data-count-of="points"' in match.group(0)
+    assert has_testid(html, "field-sync-note-n")
+    reset = client.get("/programs/lagrange_interpolation/form").text  # the HTMX reset fragment
+    assert 'data-count-of="points"' in reset
+    for other in ("ch01_p01", "ch01_p02", "ch03_p01", "ch03_p02"):
+        assert "data-count-of" not in client.get(f"/programs/{other}").text, other
+
+
+def test_app_js_keeps_count_fields_in_sync(client: TestClient) -> None:
+    script = client.get("/static/app.js").text
+    assert "function syncCounts(fieldset)" in script
+    assert "[data-count-of]" in script
+    assert script.count("syncCounts(fieldset);") == 2  # after adding and after removing a row
 
 
 def test_lagrange_page_states(client: TestClient) -> None:

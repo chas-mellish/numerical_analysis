@@ -17,6 +17,7 @@ card, XIN on the last card; reals with ``repr`` precision. Trace
 """
 
 from collections.abc import Mapping
+from types import MappingProxyType
 from typing import ClassVar
 
 from gerald_na.algorithms.lagrange import LagrangeResult, LagrangeStep, lagrange
@@ -58,6 +59,7 @@ class LagrangeAdapter(ProgramAdapter):
     program_id: ClassVar[str] = "lagrange_interpolation"
     result_type: ClassVar[type] = LagrangeResult
     step_type: ClassVar[type] = LagrangeStep
+    count_inputs: ClassVar[Mapping[str, str]] = MappingProxyType({"n": "points"})
 
     def input_problems(
         self, entry: CatalogEntry, inputs: Mapping[str, InputValue]

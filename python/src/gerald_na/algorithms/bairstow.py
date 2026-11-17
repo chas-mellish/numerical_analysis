@@ -59,14 +59,17 @@ The book data card needs 8 + 5 = 13 corrections in real64 (and in real32).
 """
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Literal
 
 from gerald_na.algorithms._fortran_format import Rounding, format_f, format_i
 from gerald_na.errors import DegreeError, InputError, NonConvergenceError
 
 __all__ = [
+    "FACTOR_COEFFICIENT_NAMES",
+    "FACTOR_FORMS",
     "MAX_DEGREE",
     "MIN_DEGREE",
     "N_COEFFS",
@@ -87,6 +90,20 @@ MIN_DEGREE = 2
 MAX_DEGREE = 6
 
 type FactorKind = Literal["quadratic", "final_quadratic", "linear"]
+
+FACTOR_COEFFICIENT_NAMES: Mapping[FactorKind, tuple[str, ...]] = MappingProxyType(
+    {"quadratic": ("r", "s"), "final_quadratic": ("a2", "a1", "a0"), "linear": ("a1", "a0")}
+)
+"""Names of :attr:`BairstowFactor.coefficients` per factor kind (the ``FACTOR`` record keys)."""
+
+FACTOR_FORMS: Mapping[FactorKind, str] = MappingProxyType(
+    {
+        "quadratic": "X**2 + R X + S",
+        "final_quadratic": "A2 X**2 + A1 X + A0",
+        "linear": "A1 X + A0",
+    }
+)
+"""How each factor kind is printed (FORMAT 17, 22 and 23)."""
 
 _FACTOR_ROUNDING = Rounding.ZERO
 """The book's line printer chopped the factor digits (4.19999, -2.09999)."""
@@ -155,6 +172,19 @@ class BairstowFactor:
     def book_line(self, *, rounding: Rounding = _FACTOR_ROUNDING) -> str:
         """The factor's line as printed (no carriage-control column)."""
         return _fmt_factor(self, rounding)[1:]
+
+    @property
+    def form(self) -> str:
+        """The printed form of the factor: ``X**2 + R X + S``, ``A2 X**2 + A1 X + A0`` or
+        ``A1 X + A0`` (FORMAT 17, 22 or 23)."""
+        return FACTOR_FORMS[self.kind]
+
+    def named_coefficients(self) -> dict[str, float]:
+        """The coefficients keyed by their names in the listing (and the ``FACTOR`` trace
+        record): ``r``, ``s`` for a quadratic; ``a2``, ``a1``, ``a0`` for the final quadratic;
+        ``a1``, ``a0`` for the linear factor."""
+        names = FACTOR_COEFFICIENT_NAMES[self.kind]
+        return dict(zip(names, self.coefficients, strict=True))
 
 
 def factor_roots(factor: BairstowFactor) -> tuple[complex, ...]:

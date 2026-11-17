@@ -426,3 +426,48 @@ def test_random_cards_either_factor_or_fail_cleanly(coeffs: list[float], n: int)
         return
     assert result.iterations == len(result.steps)
     assert result.factors[-1].kind in ("linear", "final_quadratic")
+
+
+def test_factor_named_coefficients_follow_the_listing_names() -> None:
+    from gerald_na.algorithms.bairstow import (
+        FACTOR_COEFFICIENT_NAMES,
+        FACTOR_FORMS,
+        BairstowFactor,
+    )
+
+    quadratic = BairstowFactor("quadratic", (4.2, -2.1))
+    assert quadratic.named_coefficients() == {"r": 4.2, "s": -2.1}
+    assert quadratic.form == "X**2 + R X + S"
+    final = BairstowFactor("final_quadratic", (1.0, -3.3, 6.2))
+    assert final.named_coefficients() == {"a2": 1.0, "a1": -3.3, "a0": 6.2}
+    assert final.form == "A2 X**2 + A1 X + A0"
+    linear = BairstowFactor("linear", (1.0, -10.3))
+    assert linear.named_coefficients() == {"a1": 1.0, "a0": -10.3}
+    assert linear.form == "A1 X + A0"
+    assert (
+        set(FACTOR_COEFFICIENT_NAMES)
+        == set(FACTOR_FORMS)
+        == {
+            "quadratic",
+            "final_quadratic",
+            "linear",
+        }
+    )
+    with pytest.raises(ValueError, match="zip"):
+        BairstowFactor("linear", (1.0, 2.0, 3.0)).named_coefficients()
+
+
+def test_factor_names_match_the_catalog_factor_record() -> None:
+    from gerald_na.algorithms.bairstow import FACTOR_COEFFICIENT_NAMES
+    from gerald_na.registry import get_registry
+
+    record = next(r for r in get_registry().get("ch01_p02").trace.records if r.type == "FACTOR")
+    names = {name for names in FACTOR_COEFFICIENT_NAMES.values() for name in names}
+    assert names == set(record.fields) - {"kind"}
+
+
+def test_only_lagrange_declares_a_count_input() -> None:
+    from gerald_na.engines.adapters import adapters
+
+    declared = {pid: dict(a.count_inputs) for pid, a in adapters().items() if a.count_inputs}
+    assert declared == {"lagrange_interpolation": {"n": "points"}}

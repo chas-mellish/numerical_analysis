@@ -15,8 +15,9 @@
                inputmode="{{ 'numeric' if item.type == 'int' else 'decimal' }}"
                value="{{ values.scalars.get(item.name, '') }}" autocomplete="off" spellcheck="false"
                maxlength="64" aria-describedby="help-{{ item.name }}"
+               {% if item.name in count_inputs %}data-count-of="{{ count_inputs[item.name] }}"{% endif %}
                data-testid="input-{{ item.name }}">
-        <p class="help" id="help-{{ item.name }}" data-testid="field-help-{{ item.name }}">{{ item.help }}{% if bounds | trim %} <span class="bounds" data-testid="field-bounds-{{ item.name }}">({{ bounds | trim }})</span>{% endif %}</p>
+        <p class="help" id="help-{{ item.name }}" data-testid="field-help-{{ item.name }}">{{ item.help }}{% if bounds | trim %} <span class="bounds" data-testid="field-bounds-{{ item.name }}">({{ bounds | trim }})</span>{% endif %}{% if item.name in count_inputs %} <span class="sync-note" data-testid="field-sync-note-{{ item.name }}">Updated automatically when you add or remove a row of {{ entry.input(count_inputs[item.name]).label }}.</span>{% endif %}</p>
       </div>
       {% else %}
       {% set is_points = item.type == "point_list" %}

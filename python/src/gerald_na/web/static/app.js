@@ -1,4 +1,4 @@
-/* gerald-na web UI: charts, tabs, function/engine coupling and list rows.
+/* gerald-na web UI: charts, tabs, function/engine coupling, list rows and row counts.
  * No inline scripts (strict CSP); behaviour is attached by event delegation so it survives
  * HTMX swaps. Chart specs arrive as <script type="application/json" data-chart-spec>. */
 (function () {
@@ -60,6 +60,7 @@
       var fieldset = remove.closest("[data-list-name]");
       remove.closest("[data-row]").remove();
       renumber(fieldset);
+      syncCounts(fieldset);
     }
   });
 
@@ -123,6 +124,7 @@
     li.appendChild(button);
     rows.appendChild(li);
     renumber(fieldset);
+    syncCounts(fieldset);
     var first = li.querySelector("input");
     if (first) first.focus();
   }
@@ -149,6 +151,22 @@
         button.dataset.testid = "remove-row-" + name + "-" + i;
         button.setAttribute("aria-label", "Remove " + (points ? "point " : "entry ") + (i + 1));
       }
+    });
+  }
+
+  // Keep count fields (data-count-of="<list name>", e.g. Lagrange's N) equal to the number of
+  // rows after a row is added or removed. The server still validates N against the rows.
+  function syncCounts(fieldset) {
+    if (!fieldset) return;
+    var form = fieldset.closest("form");
+    if (!form) return;
+    var name = fieldset.dataset.listName;
+    var count = String(fieldset.querySelectorAll("[data-row]").length);
+    form.querySelectorAll("[data-count-of]").forEach(function (input) {
+      if (input.dataset.countOf !== name || input.value === count) return;
+      input.value = count;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
     });
   }
 

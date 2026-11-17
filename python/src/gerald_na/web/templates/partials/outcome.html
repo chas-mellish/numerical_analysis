@@ -44,6 +44,17 @@
           <div class="table-wrap"><table class="matrix" data-testid="extra-table-{{ x.name }}">
             <tbody>{% for row in x.matrix %}<tr><th scope="row">{{ loop.index }}</th>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
           </table></div>
+        {% elif x.kind == "named_records" %}
+          {% set extra_name = x.name %}
+          <div class="table-wrap"><table class="records named-records" data-testid="extra-table-{{ x.name }}">
+            <thead><tr><th scope="col">Coefficient</th><th scope="col">Value</th></tr></thead>
+            {% for rec in x.named %}{% set i = loop.index0 %}
+            <tbody data-testid="extra-{{ extra_name }}-{{ i }}" data-kind="{{ rec.kind }}">
+              <tr class="group"><th scope="rowgroup" colspan="2">{{ loop.index }}. {{ rec.label }} <code>{{ rec.form }}</code></th></tr>
+              {% for key, text in rec.fields %}<tr data-testid="extra-{{ extra_name }}-{{ i }}-{{ key }}"><th scope="row">{{ key }}</th><td>{{ text }}</td></tr>{% endfor %}
+            </tbody>
+            {% endfor %}
+          </table></div>
         {% elif x.kind == "records" %}
           <div class="table-wrap"><table class="records" data-testid="extra-table-{{ x.name }}">
             <thead><tr><th scope="col">#</th>{% for c in x.columns %}<th scope="col">{{ c }}</th>{% endfor %}</tr></thead>

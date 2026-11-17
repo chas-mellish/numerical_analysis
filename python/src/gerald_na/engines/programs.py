@@ -18,6 +18,7 @@ for the step-by-step recipe of adding a program.
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import fields, is_dataclass
+from types import MappingProxyType
 from typing import Any, ClassVar
 
 from gerald_na.engines.trace import STEP, Record, Trace
@@ -117,6 +118,11 @@ class ProgramAdapter(ABC):
     """The result dataclass returned by both engines."""
     step_type: ClassVar[type]
     """The step dataclass built from ``STEP`` records (fields == catalog step keys)."""
+    count_inputs: ClassVar[Mapping[str, str]] = MappingProxyType({})
+    """Integer inputs that count the rows of a list input, ``{count input: list input}``
+    (Lagrange: ``{"n": "points"}``). The web form keeps such a field equal to the number of rows
+    while the learner adds or removes rows; :meth:`input_problems` still enforces the rule on
+    every request."""
 
     @abstractmethod
     def run_python(

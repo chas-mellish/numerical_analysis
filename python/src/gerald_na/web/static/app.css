@@ -135,6 +135,9 @@ caption { text-align: left; color: var(--text-secondary); font-size: 0.85rem; pa
 th, td { padding: 0.25rem 0.7rem; border-bottom: 1px solid var(--grid); text-align: right; }
 th { background: var(--surface-0); font-weight: 600; }
 td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.named-records tr.group th { text-align: left; background: var(--surface-1); padding-top: 0.5rem; }
+.named-records tbody th[scope="row"] { font-family: var(--mono); font-weight: 500; }
+.sync-note { display: block; }
 tbody tr:nth-child(even) td { background: #f8f7f4; }
 td.diff-cell { background: var(--diff-bg) !important; outline: 1px solid #eb6834; cursor: help; }
 .extras { margin-bottom: 1rem; }

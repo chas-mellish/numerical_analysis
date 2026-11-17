@@ -493,6 +493,10 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
      equal the number of points). Both engines call `check_inputs` (which raises `InputError`
      with those messages) after request validation and before anything runs; the web layer
      reports them per field (422 `INPUT` with `fields`);
+   * optionally set `count_inputs = {count input: list input}` when an integer input counts the
+     rows of a list input (Lagrange: `{"n": "points"}`). The web form marks that field with
+     `data-count-of` and `static/app.js` keeps it equal to the number of rows as the learner
+     adds or removes rows; `input_problems` still enforces the rule on every request;
    * optionally override `substituted_ordinates(entry, function) -> {x: value}` when the program
      uses a fixed value instead of F(x) somewhere (Simpson and Romberg: F(0) = 1 for the book's
      SIN(X)/X); the charts draw F the same way. Shared input accessors (`real_input`,
@@ -606,8 +610,10 @@ Run form fields: `in_<name>` for `real`/`int`; `in_<name>` repeated per element 
 entries; request bodies over 64 KiB are refused with 413. A list with a fixed `length` (Bairstow's
 seven coefficients) has no add/remove buttons and any other count is a field error. Constraints
 between inputs come from the adapter's `input_problems`: for Lagrange, `n` must equal the number
-of point rows, so after adding or removing a point the learner updates N, otherwise the form
-answers 422 with the message on the `n` field (`field-error-n`).
+of point rows. The adapter declares `n` as the count of `points` (`count_inputs`), so the form
+updates N by itself whenever a point row is added or removed (`field-sync-note-n` says so); an N
+typed by hand that disagrees with the rows is still answered with 422 and the message on the `n`
+field (`field-error-n`).
 
 ### `POST /api/programs/{id}/run`
 
@@ -641,8 +647,11 @@ the charts; the iteration table (`results-table`, one `step-row` per step, colum
 descriptors from `trace.step_columns`, the full value as tooltip); "Result details"
 (`result-extras`) made of every result dataclass field except `value`, `converged`, `iterations`
 and `steps`, rendered by shape: scalars (`extra-<field>`), number lists, ragged tables such as the
-Romberg triangle (`extra-table-<field>`), and lists of dataclasses or dicts such as Bairstow
-factors (a table with one column per key); the book text (`book-text`) and the verbose extras
+Romberg triangle (`extra-table-<field>`), lists of dataclasses or dicts (a table with one column
+per key), and lists of records with named coefficients such as Bairstow's factors
+(`extra-table-factors`: one row group `extra-factors-<i>` with `data-kind` per factor, headed by
+its kind and printed form, and one named row `extra-factors-<i>-<name>` per coefficient: `r`, `s`
+for a quadratic, `a2`, `a1`, `a0` for the final quadratic, `a1`, `a0` for the linear factor); the book text (`book-text`) and the verbose extras
 (`verbose-text`).
 
 Compare mode: `compare-summary` (`data-matches`, `compare-verdict`, `compare-iterations` with
@@ -677,7 +686,7 @@ Navigation: `nav-brand`, `nav-home`, `nav-api`, `nav-api-docs`. Home: `program-l
 Header: `program-title`, `book-ref`, `book-ref-unconfirmed`, `program-id`, `program-summary`. Form:
 `run-form`, `input-<name>` (the input itself; for lists, the fieldset), `input-<name>-<i>` (list
 element), `input-<name>-<i>-x` / `-y` (point), `add-row-<name>`, `remove-row-<name>-<i>`,
-`field-help-<name>`, `field-bounds-<name>`, `data-card-toggle`, `data-card`, `preset-select`,
+`field-help-<name>`, `field-bounds-<name>`, `field-sync-note-<name>` (a count input), `data-card-toggle`, `data-card`, `preset-select`,
 `preset-expr`, `custom-expr`, `engine-selector`, `engine-python`, `engine-fortran`,
 `engine-compare`, `engine-note-<engine>` (why it is unavailable), `engine-custom-note`,
 `run-button`, `reset-button`, `run-indicator`. Results: `results`, `results-placeholder`,

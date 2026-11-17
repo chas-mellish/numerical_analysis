@@ -196,6 +196,13 @@ class WebState:
         """A Fortran runner bound to this application's settings and catalog."""
         return FortranRunner(self.settings, registry=self.registry)
 
+    @classmethod
+    def count_inputs(cls, entry: CatalogEntry) -> Mapping[str, str]:
+        """The adapter's ``{count input: list input}`` pairs (empty without an adapter)."""
+        if not cls.has_adapter(entry):
+            return {}
+        return get_adapter(entry.id).count_inputs
+
     @staticmethod
     def has_adapter(entry: CatalogEntry) -> bool:
         """True when the engines know how to run ``entry`` (an adapter is registered)."""
