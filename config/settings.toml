@@ -1,0 +1,14 @@
+# Runtime settings for the gerald-na web tool and engines.
+# Every key can be overridden with an environment variable prefixed GERALD_NA_
+# (for example GERALD_NA_PORT=9000 or GERALD_NA_FORTRAN_BIN_DIR=build/single/bin).
+# Relative paths are resolved against the repository root.
+
+# Directory holding the compiled Fortran drivers (`make build-fortran` installs them here).
+fortran_bin_dir = "build/bin"
+# Wall-clock limit, in seconds, for one Fortran driver run.
+run_timeout_s = 5.0
+# Engines offered by the UI and API.
+engines_enabled = ["python", "fortran"]
+# Address used by `gerald-na serve`.
+host = "127.0.0.1"
+port = 8000
