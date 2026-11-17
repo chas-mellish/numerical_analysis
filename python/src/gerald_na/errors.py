@@ -6,7 +6,7 @@ exactly the ``code=`` values of the ``ERROR`` records that the Fortran drivers p
 ``--trace`` mode, so both engines report failures identically (see ``docs/architecture.md``).
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from types import MappingProxyType
 from typing import ClassVar
 
@@ -16,6 +16,7 @@ __all__ = [
     "DegreeError",
     "EngineError",
     "EngineUnavailableError",
+    "ExpressionError",
     "FortranRunError",
     "GeraldNAError",
     "InputError",
@@ -27,19 +28,49 @@ __all__ = [
 
 
 class GeraldNAError(Exception):
-    """Base class of every error raised by :mod:`gerald_na`."""
+    """Base class of every error raised by :mod:`gerald_na`.
+
+    Algorithm errors raised part-way through an iteration may carry context for the UI:
+    ``steps`` holds the iteration rows computed before the failure (the step dataclasses of the
+    algorithm that raised, for example ``BisectionStep``), and ``book_output`` holds the book's
+    line-printer text up to and including the error message.
+    """
 
     code: ClassVar[str] = "ERROR"
 
-    def __init__(self, message: str) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        steps: Iterable[object] = (),
+        book_output: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
+        self.steps: tuple[object, ...] = tuple(steps)
+        self.book_output = book_output
 
 
 class InputError(GeraldNAError, ValueError):
     """Invalid input data (data card values out of range, malformed values, bad options)."""
 
     code: ClassVar[str] = "INPUT"
+
+
+class ExpressionError(InputError):
+    """A learner-supplied function expression is invalid, unsafe, or cannot be evaluated.
+
+    ``position`` is the 1-based column in :attr:`source` where a parse or validation problem
+    was found (``None`` for evaluation errors and whole-input problems), so the form can point
+    at it.
+    """
+
+    code: ClassVar[str] = "EXPRESSION"
+
+    def __init__(self, message: str, *, source: str = "", position: int | None = None) -> None:
+        super().__init__(message)
+        self.source = source
+        self.position = position
 
 
 class BracketError(GeraldNAError, ValueError):
