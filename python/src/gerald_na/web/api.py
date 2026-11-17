@@ -9,6 +9,8 @@ paths (``status``/``error.code`` = ``BRACKET``, ``NON_CONVERGENT``, ``FORTRAN_RU
 HTTP   ``error.code``              when
 =====  ==========================  =========================================================
 404    ``NOT_FOUND``               unknown program id (or unknown ``/api`` path)
+405    ``METHOD_NOT_ALLOWED``      wrong HTTP method on an ``/api`` path (e.g. GET on ``.../run``)
+413    ``TOO_LARGE``               request body over 64 KiB (declared or streamed)
 422    ``VALIDATION``              body does not match the schema (unknown engine, wrong JSON
                                    types, unknown keys); ``details`` lists the problems
 422    ``INPUT``                   input values invalid; ``fields`` maps input -> message;
@@ -17,6 +19,7 @@ HTTP   ``error.code``              when
                                    is the 1-based column
 422    ``CUSTOM_FUNCTION_ENGINE``  custom expression with the fortran or compare engine
 503    ``ENGINE_UNAVAILABLE``      engine disabled, Fortran driver not built, no adapter
+4xx    ``HTTP_ERROR``              any other framework HTTP error on an ``/api`` path
 200    --                          the run completed: ``ok`` true or false
 =====  ==========================  =========================================================
 """

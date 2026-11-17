@@ -607,7 +607,8 @@ Run form fields: `in_<name>` for `real`/`int`; `in_<name>` repeated per element 
 `in_<name>.y` repeated per point for `point_list`; `engine` (`python`, `fortran`, `compare`),
 `function` (a preset id or `custom`) and `expression`. Numbers accept the data-card spellings
 (`0.`, `.5`, `1.E-5`, `1.D-3`); NaN and infinities are rejected. A list takes at most 100
-entries; request bodies over 64 KiB are refused with 413. A list with a fixed `length` (Bairstow's
+entries; request bodies over 64 KiB are refused with 413 (a JSON
+`TOO_LARGE` error on `/api` paths). A list with a fixed `length` (Bairstow's
 seven coefficients) has no add/remove buttons and any other count is a field error. Constraints
 between inputs come from the adapter's `input_problems`: for Lagrange, `n` must equal the number
 of point rows. The adapter declares `n` as the count of `points` (`count_inputs`), so the form
@@ -624,11 +625,14 @@ checks run in this order, and HTML and API share them (`WebState.build_request`,
 | HTTP | `error.code` | When |
 |---|---|---|
 | 404 | `NOT_FOUND` | unknown program (also any unknown `/api` path) |
+| 405 | `METHOD_NOT_ALLOWED` | wrong method on an `/api` path (e.g. `GET /api/programs/{id}/run`) |
+| 413 | `TOO_LARGE` | the request body is over 64 KiB (checked on the declared Content-Length and while streaming) |
 | 422 | `VALIDATION` | the body does not match the schema (unknown engine, wrong JSON type, unknown key, `preset < 1`); `details` lists pydantic's errors |
 | 422 | `CUSTOM_FUNCTION_ENGINE` | an `expression` with the `fortran` or `compare` engine (DD3) |
 | 422 | `INPUT` | input values invalid; `fields` maps input name to message (`_unknown` for undeclared inputs; cross-input rules such as Lagrange's `n` against its points are reported on the input named by the adapter); also an unknown preset, preset plus expression, or a function for a data-only program |
 | 422 | `EXPRESSION` | the expression does not parse or is not allowed; `position` is the 1-based column |
 | 503 | `ENGINE_UNAVAILABLE` | the engine is disabled in the settings, the Fortran driver is not built, or the program has no engine adapter |
+| 4xx | `HTTP_ERROR` | any other HTTP error raised by the framework on an `/api` path; `message` carries its detail |
 | 200 | (none) | the run executed |
 
 Every error body is `{"error": {"code", "message", ...}}`. A 200 body is `RunOutcome.to_dict()`

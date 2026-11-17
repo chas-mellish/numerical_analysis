@@ -218,3 +218,9 @@ def test_unknown_api_path_is_json_404(client: TestClient) -> None:
     response = client.get("/api/nothing")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_wrong_method_on_api_is_json_405(client: TestClient) -> None:
+    response = client.get(f"/api/programs/{BISECTION}/run")
+    assert response.status_code == 405
+    assert response.json()["error"]["code"] == "METHOD_NOT_ALLOWED"
