@@ -10,17 +10,14 @@ Data card ``B TOL`` (generic serialization). Trace (``fortran/app/ch03_p02_rombe
 like any other. ``b`` and ``tol`` of the result are the request's inputs.
 
 The seed of the sum: the book writes ``SUM = 1. + FCN(B)`` because its integrand ``SIN(X)/X``
-cannot be evaluated at X = 0; the literal is that function's limit at 0. The Fortran preset
-(``f_sinc``) returns exactly 1 there, but the catalog expression ``SIN(X)/X`` compiled by
-:mod:`gerald_na.expr` divides by zero. So when the function is the book's integrand -- the
-default preset, or a learner expression that normalizes to the same text -- this adapter passes
-the book's seed :data:`~gerald_na.algorithms.romberg.BOOK_SEED` as ``f0``; every other function
-supplies its own ordinate ``f(0)`` (and a learner function undefined at 0 is reported as an
-expression error at X = 0). Same convention as the Simpson adapter (``ch03_p01``).
+cannot be evaluated at X = 0. The shared base class
+:class:`~gerald_na.engines.adapters._common.BookSeededIntegrandAdapter` passes the book's seed
+:data:`~gerald_na.algorithms.romberg.BOOK_SEED` as ``f0`` when the function is the book's
+integrand (:func:`~gerald_na.engines.adapters._common.book_seed_for`, also used by the
+Simpson adapter); every other function supplies its own ordinate ``f(0)``.
 """
 
 from collections.abc import Mapping
-from functools import lru_cache
 from typing import ClassVar
 
 from gerald_na.algorithms.romberg import (
@@ -30,49 +27,26 @@ from gerald_na.algorithms.romberg import (
     RombergStep,
     romberg,
 )
-from gerald_na.engines.programs import Function, ProgramAdapter
+from gerald_na.engines.adapters._common import BookSeededIntegrandAdapter, real_input
+from gerald_na.engines.programs import Function
 from gerald_na.engines.trace import Trace
 from gerald_na.errors import FortranRunError
-from gerald_na.expr import CompiledExpr, compile_expr
 from gerald_na.registry import CatalogEntry
 from gerald_na.registry.models import InputValue
 
-__all__ = ["RombergAdapter", "book_seed_for"]
+__all__ = ["RombergAdapter"]
 
 TABLE = "TABLE"
 """Trace record type of the Romberg table cells."""
 
 
-def _real(inputs: Mapping[str, InputValue], name: str) -> float:
-    value = inputs[name]
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        raise TypeError(f"input {name!r} must be a number, got {value!r}")
-    return float(value)
-
-
-@lru_cache(maxsize=16)
-def _normalized(source: str) -> str:
-    return compile_expr(source).normalized
-
-
-def book_seed_for(entry: CatalogEntry, function: Function) -> float | None:
-    """``BOOK_SEED`` when ``function`` is the book's integrand (the default preset), else ``None``.
-
-    The comparison uses the normalized expression text, so ``SINF(X)/X`` typed by a learner is
-    recognized as the book's function as well.
-    """
-    if not isinstance(function, CompiledExpr) or entry.function.default_preset is None:
-        return None
-    book = entry.function.preset(entry.function.default_preset).expr
-    return BOOK_SEED if function.normalized == _normalized(book) else None
-
-
-class RombergAdapter(ProgramAdapter):
+class RombergAdapter(BookSeededIntegrandAdapter):
     """``romberg(f, b, tol)`` and its ``STEP``/``TABLE``/``RESULT`` records."""
 
     program_id: ClassVar[str] = "ch03_p02"
     result_type: ClassVar[type] = RombergResult
     step_type: ClassVar[type] = RombergStep
+    book_seed: ClassVar[float] = BOOK_SEED
 
     def run_python(
         self, entry: CatalogEntry, inputs: Mapping[str, InputValue], function: Function | None
@@ -81,9 +55,9 @@ class RombergAdapter(ProgramAdapter):
             raise TypeError("romberg needs a function")
         return romberg(
             function,
-            _real(inputs, "b"),
-            _real(inputs, "tol"),
-            f0=book_seed_for(entry, function),
+            real_input(inputs, "b"),
+            real_input(inputs, "tol"),
+            f0=self.seed(entry, function),
         )
 
     def result_from_trace(
@@ -124,6 +98,6 @@ class RombergAdapter(ProgramAdapter):
             steps=tuple(steps),
             table=table,
             subintervals=subintervals,
-            b=_real(inputs, "b"),
-            tol=_real(inputs, "tol"),
+            b=real_input(inputs, "b"),
+            tol=real_input(inputs, "tol"),
         )

@@ -11,7 +11,7 @@ import pytest
 
 from gerald_na.registry import Registry
 
-EXPECTED_IDS = {"ch01_p01"}
+EXPECTED_IDS = {"ch01_p01", "ch01_p02", "ch03_p01", "ch03_p02", "lagrange_interpolation"}
 """Programs that must be catalogued (grows as programs land)."""
 
 

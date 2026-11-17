@@ -347,6 +347,14 @@ def test_mismatched_n_is_rejected_before_running(entry: CatalogEntry) -> None:
         FortranRunner(Settings()).run(entry, request)
 
 
+def test_input_problems_name_the_count_field(entry: CatalogEntry) -> None:
+    adapter = get_adapter(entry.id)
+    assert adapter.input_problems(entry, entry.defaults()) == {}
+    problems = adapter.input_problems(entry, {**entry.defaults(), "n": 3})
+    assert list(problems) == ["n"]
+    assert "N must equal the number of (X, Y) pairs" in problems["n"]
+
+
 def test_function_and_type_guards(entry: CatalogEntry) -> None:
     adapter = get_adapter(entry.id)
     with pytest.raises(TypeError):

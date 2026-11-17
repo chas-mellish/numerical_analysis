@@ -10,18 +10,18 @@ from types import MappingProxyType
 
 from gerald_na.engines.adapters.bairstow import BairstowAdapter
 from gerald_na.engines.adapters.bisection import BisectionAdapter
-from gerald_na.engines.adapters.simpson import SimpsonAdapter
-from gerald_na.engines.adapters.romberg import RombergAdapter
 from gerald_na.engines.adapters.lagrange import LagrangeAdapter
+from gerald_na.engines.adapters.romberg import RombergAdapter
+from gerald_na.engines.adapters.simpson import SimpsonAdapter
 from gerald_na.engines.programs import ProgramAdapter
 from gerald_na.errors import EngineUnavailableError
 
 __all__ = [
     "BairstowAdapter",
     "BisectionAdapter",
-    "SimpsonAdapter",
-    "RombergAdapter",
     "LagrangeAdapter",
+    "RombergAdapter",
+    "SimpsonAdapter",
     "adapters",
     "get_adapter",
     "register_adapter",

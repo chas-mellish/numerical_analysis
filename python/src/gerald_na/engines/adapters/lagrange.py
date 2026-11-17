@@ -1,8 +1,9 @@
 """Engine adapter of ``lagrange_interpolation`` (:mod:`gerald_na.algorithms.lagrange`).
 
 Inputs ``n`` (int), ``points`` (``n`` pairs X, Y) and ``xin`` are coupled: ``n`` must equal the
-number of points, which :meth:`LagrangeAdapter.check_inputs` enforces on both engines before
-anything runs (the catalog bounds alone cannot express it).
+number of points, which :meth:`LagrangeAdapter.input_problems` reports (keyed by ``n``, so the
+web form marks that field) and ``check_inputs`` enforces on both engines before anything runs
+(the catalog bounds alone cannot express it).
 
 Data card (book layout, ``READ 100, N, (X(I), Y(I), I = 1,N)`` with ``100 FORMAT (I2/(2F10.0))``
 and ``READ 101, XIN``): N on the first card written like the book's ``05``, one ``X Y`` pair per
@@ -21,7 +22,7 @@ from typing import ClassVar
 from gerald_na.algorithms.lagrange import LagrangeResult, LagrangeStep, lagrange
 from gerald_na.engines.programs import Function, ProgramAdapter, card_number
 from gerald_na.engines.trace import Trace
-from gerald_na.errors import FortranRunError, InputError
+from gerald_na.errors import FortranRunError
 from gerald_na.registry import CatalogEntry
 from gerald_na.registry.models import InputValue
 
@@ -58,13 +59,16 @@ class LagrangeAdapter(ProgramAdapter):
     result_type: ClassVar[type] = LagrangeResult
     step_type: ClassVar[type] = LagrangeStep
 
-    def check_inputs(self, entry: CatalogEntry, inputs: Mapping[str, InputValue]) -> None:
+    def input_problems(
+        self, entry: CatalogEntry, inputs: Mapping[str, InputValue]
+    ) -> dict[str, str]:
         n, points = _count(inputs), _points(inputs)
         if n != len(points):
-            raise InputError(
-                f"input 'n' is {n} but 'points' has {len(points)} pairs: "
+            return {
+                "n": f"input 'n' is {n} but 'points' has {len(points)} pairs: "
                 "N must equal the number of (X, Y) pairs on the data card"
-            )
+            }
+        return {}
 
     def run_python(
         self, entry: CatalogEntry, inputs: Mapping[str, InputValue], function: Function | None

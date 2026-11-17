@@ -17,7 +17,8 @@ from gerald_na.algorithms.romberg import (
 )
 from gerald_na.engines import PythonEngine, RunRequest
 from gerald_na.engines.adapters import get_adapter
-from gerald_na.engines.adapters.romberg import RombergAdapter, book_seed_for
+from gerald_na.engines.adapters._common import book_seed_for
+from gerald_na.engines.adapters.romberg import RombergAdapter
 from gerald_na.engines.trace import parse_trace
 from gerald_na.errors import ExpressionError, FortranRunError, InputError
 from gerald_na.expr import compile_expr
@@ -401,11 +402,17 @@ def test_adapter_registered() -> None:
 
 
 def test_book_seed_only_for_the_book_integrand(entry: CatalogEntry) -> None:
-    assert book_seed_for(entry, compile_expr("SIN(X)/X")) == BOOK_SEED
-    assert book_seed_for(entry, compile_expr("sinf(x) / x")) == BOOK_SEED
-    assert book_seed_for(entry, compile_expr("EXP(-X**2)")) is None
-    assert book_seed_for(entry, compile_expr("sin(x)/x + 0")) is None
-    assert book_seed_for(entry, sinc) is None
+    assert book_seed_for(entry, compile_expr("SIN(X)/X"), BOOK_SEED) == BOOK_SEED
+    assert book_seed_for(entry, compile_expr("sinf(x) / x"), BOOK_SEED) == BOOK_SEED
+    assert book_seed_for(entry, compile_expr("EXP(-X**2)"), BOOK_SEED) is None
+    assert book_seed_for(entry, compile_expr("sin(x)/x + 0"), BOOK_SEED) is None
+    assert book_seed_for(entry, sinc, BOOK_SEED) is None
+
+
+def test_adapter_substitutes_the_seed_for_the_chart(entry: CatalogEntry) -> None:
+    adapter = get_adapter("ch03_p02")
+    assert adapter.substituted_ordinates(entry, compile_expr("SIN(X)/X")) == {0.0: BOOK_SEED}
+    assert adapter.substituted_ordinates(entry, compile_expr("EXP(-X**2)")) == {}
 
 
 def test_python_engine_runs_the_book_card(entry: CatalogEntry, book_result: RombergResult) -> None:

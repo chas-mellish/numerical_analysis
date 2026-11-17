@@ -21,7 +21,7 @@ from dataclasses import fields, is_dataclass
 from typing import Any, ClassVar
 
 from gerald_na.engines.trace import STEP, Record, Trace
-from gerald_na.errors import FortranRunError
+from gerald_na.errors import FortranRunError, InputError
 from gerald_na.registry import CatalogEntry
 from gerald_na.registry.models import InputValue
 
@@ -124,14 +124,34 @@ class ProgramAdapter(ABC):
     ) -> Any:
         """Call the Python algorithm. ``function`` is ``None`` for data-only programs."""
 
+    def input_problems(
+        self, entry: CatalogEntry, inputs: Mapping[str, InputValue]
+    ) -> dict[str, str]:
+        """Cross-input problems the per-input catalog bounds cannot express (default: none).
+
+        Returns a message per input name (for example Lagrange's ``n`` not matching its number
+        of points), so the web form can point at the field. ``inputs`` are already validated
+        one by one (:func:`~gerald_na.engines.base.validate_request`).
+        """
+        return {}
+
     def check_inputs(self, entry: CatalogEntry, inputs: Mapping[str, InputValue]) -> None:
-        """Cross-input checks the per-input catalog bounds cannot express (default: none).
+        """Raise :class:`InputError` when :meth:`input_problems` reports anything.
 
         Both engines call this after :func:`~gerald_na.engines.base.validate_request` and before
-        anything runs, so a violation is a request problem (:class:`InputError`) on either
-        engine, for example Lagrange's ``n`` not matching its number of points.
+        anything runs, so a violation is a request problem (``INPUT``) on either engine.
         """
-        return None
+        problems = self.input_problems(entry, inputs)
+        if problems:
+            raise InputError("; ".join(problems.values()))
+
+    def substituted_ordinates(self, entry: CatalogEntry, function: Function) -> dict[float, float]:
+        """Points where the program uses a fixed value instead of evaluating ``function``.
+
+        Default: none. Simpson and Romberg seed their sums with the book's literal ``1.0`` at
+        X = 0 for SIN(X)/X; the web charts use this to draw F the way the program evaluates it.
+        """
+        return {}
 
     def data_card(self, entry: CatalogEntry, inputs: Mapping[str, InputValue]) -> str:
         """The stdin text for the Fortran driver (default: :func:`serialize_card`)."""
