@@ -6,7 +6,9 @@
   <figure class="source">
     <figcaption>{% if caption %}<strong>{{ caption }}</strong> {% endif %}{% if file.path %}<code>{{ file.path }}</code>{% endif %}
       {% if file.url %}<a href="{{ file.url }}" target="_blank" rel="noopener" data-testid="download-{{ testid }}">raw file</a>{% endif %}</figcaption>
-    {% if file.text is not none %}
+    {% if file.is_pdf %}
+    <p class="empty" data-testid="{{ testid }}-pdf">A scanned page (PDF); no OCR text of it exists. <a href="{{ file.url }}" target="_blank" rel="noopener">Open the PDF</a>.</p>
+    {% elif file.text is not none %}
     <pre class="code" data-testid="{{ testid }}"><code>{{ file.text }}</code></pre>
     {% else %}
     <p class="empty" data-testid="{{ testid }}-missing">Not available: {{ file.missing_reason }}</p>
@@ -66,7 +68,7 @@
   </div>
 
   <div role="tabpanel" id="panel-legacy" aria-labelledby="tab-legacy" data-testid="panel-legacy" tabindex="0" hidden>
-    <p class="help">The OCR transcription kept in <code>legacy_code/</code>, shown as is: it contains the transcription slips listed in the errata.</p>
+    <p class="help">The OCR transcription kept in <code>legacy_code/</code>, shown as is: it contains the transcription slips listed in the errata. Pages kept only as scans are linked as PDFs.</p>
     {% for file in legacy_files %}
       {{ source_block(file, "legacy-source-" ~ loop.index0) }}
     {% endfor %}

@@ -45,6 +45,7 @@ PRECISION_FIGURES = {
     "ch01_p02": ("4.19999", "3.29999", "chopped"),
     "ch03_p01": ("1.5499312", "1.5499307", "gerald_na.tools.book_machine"),
     "ch03_p02": ("1.6181944", "1.6181936", "gerald_na.tools.book_machine"),
+    "ch04_p01": ("1.0000150E-04", "1.0000166E-04", "0.0000000E-99", "central_difference_rows"),
     "lagrange_interpolation": ("2.3119", "2.3119012901784366"),
 }
 """Values each page's precision section must quote (book versus modern digits)."""

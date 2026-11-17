@@ -18,7 +18,9 @@ below replay the listings operation by operation, in the same order as the modul
 * :func:`bisection_rows`: the Ch. 1 Prog. 1 card, whose printed digits every model reproduces
   (not discriminating);
 * :func:`coefficient_echo`: the Ch. 1 Prog. 2 coefficient echo, which only a decimal machine
-  prints exactly.
+  prints exactly;
+* :func:`central_difference_rows`: the Ch. 4 Prog. 1 card ``0.0 0.1`` with F(X) = X**2*EXPF(X),
+  whose small-H DX digits none of the models reproduces (they depend on the machine's EXPF).
 
 Printed values are chopped as well (:func:`printed`): the book's printer truncated the last
 digit and dropped the leading zero.
@@ -47,6 +49,7 @@ __all__ = [
     "ChoppedMachine",
     "RombergRun",
     "bisection_rows",
+    "central_difference_rows",
     "coefficient_echo",
     "main",
     "printed",
@@ -284,6 +287,31 @@ def bisection_rows(machine: ChoppedMachine) -> tuple[tuple[int, Fraction, Fracti
             x2 = x
         else:
             x1, fx1 = x, fx
+    return tuple(rows)
+
+
+def central_difference_rows(machine: ChoppedMachine) -> tuple[tuple[Fraction, Fraction], ...]:
+    """Ch. 4 Prog. 1 (central differences) on ``machine`` with the book card ``0.0 0.1``.
+
+    ``F(X) = X**2*EXPF(X)``; returns ``(DX, DDX)`` per printed row, in the listing's order:
+    ``FO = F(X)`` once, then ``DX = (FR - FL)/(2.*H)``, ``DDX = (FR - 2.*FO + FL)/H**2`` and
+    ``H = 0.1*H`` (accumulated) for ten rows.
+    """
+    m = machine
+    two, tenth = m.const("2."), m.const("0.1")
+
+    def f(x: Fraction) -> Fraction:
+        return m.mul(m.mul(x, x), m.exp(x))
+
+    x, h = m.const("0.0"), m.const("0.1")
+    fo = f(x)
+    rows: list[tuple[Fraction, Fraction]] = []
+    for _ in range(10):
+        fr, fl = f(m.add(x, h)), f(m.sub(x, h))
+        dx = m.div(m.sub(fr, fl), m.mul(two, h))
+        ddx = m.div(m.add(m.sub(fr, m.mul(two, fo)), fl), m.mul(h, h))
+        rows.append((dx, ddx))
+        h = m.mul(tenth, h)
     return tuple(rows)
 
 

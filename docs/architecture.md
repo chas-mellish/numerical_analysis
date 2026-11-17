@@ -67,6 +67,7 @@ numerical_analysis/
 | `ch01_p02` | `catalog/ch01_p02_bairstow.toml` | `ch01_p02_bairstow` | `content/ch01_p02.md` | Bairstow quadratic factors |
 | `ch03_p01` | `catalog/ch03_p01_simpson.toml` | `ch03_p01_simpson` | `content/ch03_p01.md` | Simpson's 1/3 rule, Si(B) |
 | `ch03_p02` | `catalog/ch03_p02_romberg.toml` | `ch03_p02_romberg` | `content/ch03_p02.md` | Romberg integration, Si(B) |
+| `ch04_p01` | `catalog/ch04_p01_central_difference.toml` | `ch04_p01_central_difference` | `content/ch04_p01.md` | Derivatives by central differences |
 | `lagrange_interpolation` | `catalog/lagrange_interpolation.toml` | `lagrange_interpolation` | `content/lagrange_interpolation.md` | Lagrangian interpolation |
 
 Program pages are served at `/programs/<catalog id>`.
@@ -173,7 +174,10 @@ The UI shows the scan, the legacy OCR text, the modern Fortran and the Python so
 whitelisted route, `GET /files/{program_id}/{kind}`, with `kind` one of `scan`, `legacy`,
 `fortran_module`, `fortran_app`, `python` and `study`. The file path comes only from the catalog
 entry and is resolved under the repository root (`repo_root` from settings). No user-supplied
-paths are accepted, which rules out path traversal and keeps the files in one place. The container
+paths are accepted, which rules out path traversal and keeps the files in one place. A `legacy`
+file may be a PDF (a page kept only as a scan, such as `ch04_p01`'s, which has no OCR text): it is
+served as `application/pdf` and the Legacy tab links it (`legacy-source-<i>-pdf`) instead of
+showing it as text. The container
 image therefore includes `docs/`, `legacy_code/`, `fortran/`, `catalog/`, `content/` and `python/`.
 
 ## Catalog schema
@@ -251,7 +255,8 @@ the reference example.
     the same shape as `book_value`.
 * **`[files]`**: paths are relative POSIX paths under the repository root. Absolute paths, `..`,
   `.`, empty segments and backslashes are rejected.
-  * `legacy`: list of at least one path.
+  * `legacy`: list of at least one path: the OCR text, or, when none exists, the scanned pages
+    (`.pdf`, linked rather than shown in the Legacy tab).
   * `scan_pdf`: optional; absent means "no scan available".
   * `fortran_module`, `fortran_app`.
   * `fortran_executable`: the name in `build/bin`; it must be the id or start with `<id>_`.
@@ -259,7 +264,7 @@ the reference example.
   * `study_page`.
 * **`[chart]`**:
   * `kind`: one of `bracket`, `abs_residual`, `romberg_heatmap`, `integrand_panels`, `factors`,
-    `interpolant`.
+    `interpolant`, `convergence`.
   * `options`: a free-form table of scalars or lists; what each kind reads is listed under
     "Web UI and JSON API", "Chart kinds".
 * **`[[practice]]`**:
@@ -311,9 +316,9 @@ the reference example.
   * blank preset expressions, or ones that do not compile;
   * defaults or practice overrides out of bounds.
 
-  Files that no entry references are never inspected, so scans that are not catalogued yet (the
-  Chapter 4/5 PDFs that upstream `main` adds under `legacy_code/fortran/chapter_4/` and
-  `chapter_5/`, not merged into this branch) cannot make the check fail.
+  Files that no entry references are never inspected, so scans that are not catalogued (such as
+  the Chapter 5 formula summary `legacy_code/fortran/chapter_5/integration_methods.pdf`, which
+  holds no program) cannot make the check fail.
   `gerald-na catalog check` prints the problems and exits with status 1. `gerald-na catalog list`
   prints the index. The test `python/tests/unit/test_catalog_integrity.py` requires an empty
   list.
@@ -554,6 +559,17 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
   has `iterations + 1` lines. Not meeting TOL after 8 extrapolations is a `RESULT` with
   `converged=F` (exit status 0), as the book prints the table and a note. The seed
   `SUM = 1. + FCN(B)` follows the Simpson convention through the same shared base class.
+* **ch04_p01 (central differences).** Scan only (`legacy_code/fortran/chapter_4/derivatives.pdf`,
+  book p. 90; no OCR text, so `files.legacy` lists the p. 90 and p. 91 scans, which the Legacy tab
+  links). `STEP,k,h,dx,ddx` per printed row (always 10); `RESULT` `value` is DX of the last row
+  (the smallest H; there is no stopping test, `converged=T`), extras `fo`, `first_dx`,
+  `first_ddx`, `last_ddx`, which the adapter checks against the first and last `STEP`. H is
+  accumulated (`H = 0.1*H`, with a `wp` literal on the Fortran side). Book text: the scan prints
+  `E` fields with one digit before the point (`ES` editing) and a zero as `0.0000000E-99`; DX
+  and DDX are chopped, the echoed X (`F5.2` with its leading zero) and H rounded to nearest. A
+  non-finite F, DX or DDX is `INPUT` with the rows so far; the heading is printed before
+  `FO = F(X)`, so the book text of such a run holds the heading. Preset 3 (`1 + LOG10(X)`, the
+  p. 91 problem 2 table) is undefined at the book card, so `parity_outcomes` includes `INPUT`.
 * **lagrange_interpolation.** No scan exists; the listing was transcribed from the OCR text only, and the corrections are
   justified by syntax, the FORMAT Hollerith counts and the printed 2.3119 (see the catalog
   errata). The pairs are X(I), Y(I) in READ order (verified numerically).
@@ -611,7 +627,7 @@ no CDN at runtime).
 | `GET /api/programs` | list: `id`, `title`, `method`, `book_ref`, `confirmed`, `book_ref_text`, `chapter`, `inputs` (catalog schema), `takes_function`, `default_preset`, `presets`, `engines` (available now, including `compare`), `scan_available`, `chart_kind`, `url`, `api_url` |
 | `GET /api/programs/{id}` | the full catalog entry; `files` holds `/files/...` URLs instead of paths (plus `fortran_executable`, `python_callable`); `engines` maps `python`/`fortran`/`compare` to `{available, reason}` |
 | `POST /api/programs/{id}/run` | see below |
-| `GET /files/{id}/{kind}[?index=N]` | DD5 whitelist: `scan` (`application/pdf`), `legacy` (`index` picks one of several), `fortran_module`, `fortran_app`, `python`, `study` (all `text/plain; charset=utf-8`), served inline with `nosniff`. Unknown program or kind, a missing file or scan, a bad index, `catalog` and any traversal attempt are 404; paths come only from `Registry.resolve_path` |
+| `GET /files/{id}/{kind}[?index=N]` | DD5 whitelist: `scan` (`application/pdf`), `legacy` (`index` picks one of several; a `.pdf` legacy file is `application/pdf`), `fortran_module`, `fortran_app`, `python`, `study` (all `text/plain; charset=utf-8`), served inline with `nosniff`. Unknown program or kind, a missing file or scan, a bad index, `catalog` and any traversal attempt are 404; paths come only from `Registry.resolve_path` |
 
 Run form fields: `in_<name>` for `real`/`int`; `in_<name>` repeated per element for `real_list`
 (editable rows; add/remove buttons unless the input has a fixed `length`); `in_<name>.x` and
@@ -703,6 +719,7 @@ specs travel as JSON in `<script type="application/json" data-testid="result-cha
 | `integrand_panels` | `integrand_panels` | F sampled at 400 points over [`a` (number), or input `lower_input`, or 0; input `upper_input` [b]], widened to cover the ordinates; ordinates from steps `x_key` [x], `y_key` [fx]; `weight_key` [weight] shown in the hover. F is evaluated the way the program does: the adapter's `substituted_ordinates` (Simpson/Romberg: F(0) = 1 for the book's SIN(X)/X) replace the expression there; other points where F fails (a learner's 1/x at 0) are gaps |
 | `factors` | `factors_r`, `factors_s`, `factors_roots`, plus `factors_delta` with `delta_keys` and `factors_polynomial` with `show_polynomial` | steps grouped by `group_key` [factor], with `index_key` [k], `r_key` [r], `s_key` [s]. Roots come from result `roots_field` [roots] (complex numbers, `[re, im]` or `{re, im}`), otherwise from result `factors_field` [factors]: dicts or dataclasses with `kind = quadratic` (`r`, `s`; `quadratic_form` ["x^2 - r x - s", Gerald's convention, whose sum of roots is 17.8 for the book polynomial; or "x^2 + r x + s"]), `final_quadratic` (`a2`, `a1`, `a0`) or `linear` (`a1`, `a0`), the coefficients either as named keys or as one `coefficients` list in that order (`BairstowFactor`). With `poly_input` (a real_list input, highest power first) the polynomial's own roots (Durand-Kerner) are added as a reference, and `show_polynomial = true` draws P(x) with the real roots marked. `delta_keys` (e.g. `["delr", "dels"]`) plots the sum of their absolute values per iteration and factor (log scale unless `log_delta = false`) |
 | `interpolant` | `interpolant` | nodes from input `points_input` [points], only the first `count_input` [n] when that input exists; the Lagrange polynomial through them (`samples` [400] points); the point (input `x_input` [xin], result `value`); axis titles `x_label` [x], `y_label` [y] |
+| `convergence` | `convergence_<key>` per key of `y_keys`, plus `convergence_changes` unless `changes = false` | steps `y_keys` (list) against step `x_key` [h] (the row number if the column is absent), log x axis unless `log_x = false`; keys in `log_y_keys` are drawn as \|y\| on a log scale. `convergence_changes` draws \|y(row i+1) - y(row i)\| at the x of row i on log-log axes, an error estimate that shows where round-off takes over (ch04_p01: DX and DDX against H). Zeros and negatives are left out on log axes |
 
 ### Program page testids
 
@@ -721,7 +738,7 @@ element), `input-<name>-<i>-x` / `-y` (point), `add-row-<name>`, `remove-row-<na
 and compare ids above. Tabs: `tab-scan`, `tab-legacy`, `tab-fortran`, `tab-python`, `tab-study`;
 panels `panel-*`; `scan-viewer` (an `<object type="application/pdf">`), `scan-download`,
 `scan-download-fallback`, `scan-missing` ("No scan available for this program"),
-`legacy-source-<i>`, `fortran-module-source`, `fortran-app-source`, `python-source` (each
+`legacy-source-<i>` (`legacy-source-<i>-pdf` for a scanned legacy page), `fortran-module-source`, `fortran-app-source`, `python-source` (each
 `*-missing` when the file is absent, `download-<same id>` for the raw file), `study-content`,
 `download-study`, `study-missing`. Practice: `practice-section`, `practice-empty`, `practice-<qid>`,
 `practice-prompt-<qid>`, `practice-answer-<qid>`, `practice-submit-<qid>`, `practice-feedback-<qid>`,

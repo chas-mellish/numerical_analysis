@@ -113,6 +113,8 @@ class SourceFile:
     url: str
     text: str | None
     missing_reason: str = ""
+    is_pdf: bool = False
+    """The file is a scanned page (a PDF), shown as a link rather than as text."""
 
 
 def field_problems(entry: CatalogEntry, raw: Mapping[str, object]) -> dict[str, str]:
@@ -336,6 +338,9 @@ class WebState:
             url = self.file_url(entry, kind, index)
             try:
                 path = self.resolve_file(entry, kind, index)
+                if is_pdf_path(path):
+                    files.append(SourceFile(kind, index, relative, url, None, is_pdf=True))
+                    continue
                 if path.stat().st_size > MAX_SOURCE_BYTES:
                     files.append(SourceFile(kind, index, relative, url, None, "file too large"))
                     continue
@@ -355,6 +360,11 @@ class WebState:
         except CatalogPathError:
             return False
         return True
+
+
+def is_pdf_path(path: Path) -> bool:
+    """True for a PDF file (a scanned page), recognized by its ``.pdf`` suffix."""
+    return path.suffix.lower() == ".pdf"
 
 
 def describe_book_ref(entry: CatalogEntry) -> str:

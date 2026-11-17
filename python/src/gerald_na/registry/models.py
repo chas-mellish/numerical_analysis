@@ -42,7 +42,13 @@ __all__ = [
 type InputType = Literal["real", "int", "real_list", "point_list"]
 type ExpectedKind = Literal["real", "int", "text", "table", "rows"]
 type ChartKind = Literal[
-    "bracket", "abs_residual", "romberg_heatmap", "integrand_panels", "factors", "interpolant"
+    "bracket",
+    "abs_residual",
+    "romberg_heatmap",
+    "integrand_panels",
+    "factors",
+    "interpolant",
+    "convergence",
 ]
 type ErratumKind = Literal[
     "ocr_slip", "original_bug", "original_quirk", "rewrite_drift", "modernization"
