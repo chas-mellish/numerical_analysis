@@ -201,12 +201,14 @@
 !     without a leading zero (.4414062 ... .4435729). The golden tests compare
 !     numbers; in addition this driver's book text uses RZ and drops the
 !     leading zero so the text matches the scan. See E.
-!   9 structured-control-flow (modernization): arithmetic IF / GO TO / CALL
+!   9 label-5-fall-through (original_bug): label 5 (PRINT 201, X1) had no CALL
+!     EXIT and fell through to message 202 after an endpoint root; corrected,
+!     the run ends successfully with root_at_endpoint=T. See C.
+!  10 structured-control-flow (modernization): arithmetic IF / GO TO / CALL
 !     EXIT became SELECT CASE, a DO loop and STOP with an exit status; F is a
 !     procedure argument (--preset N); EXPF/SINF/ABSF became EXP/SIN/ABS;
 !     every zero branch is kept. See D.
-!   Not a catalog id: the label-5 fall-through bug of the original (C) and
-!   non-finite function values. F returning NaN or +-Inf (for example
+!   Not a catalog id: non-finite function values. F returning NaN or +-Inf (for example
 !   EXP(-X) overflowing for X < -709 in real64, X < -88 in real32; impossible
 !   as IEEE specials on the original machine)
 !   stops the run as an INPUT error (ERROR,code=INPUT in trace mode, a message

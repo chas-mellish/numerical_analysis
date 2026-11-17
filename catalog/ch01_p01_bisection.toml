@@ -316,6 +316,13 @@ corrected = "0.4414063, 0.4433594, 0.4438477, 0.4435425, 0.4435730 (gfortran F10
 note = "The 1970s line printer truncated the last digit and dropped the leading zero. Not a code change: the golden tests compare numbers within 1e-7 rather than text."
 
 [[errata]]
+id = "label-5-fall-through"
+kind = "original_bug"
+original = "5 PRINT 201, X1   (no CALL EXIT: falls through to label 4/6, so F(X1) = 0 with F(X2) /= 0 also printed message 202)"
+corrected = "label 5 reports the endpoint root and the run ends successfully (RESULT root_at_endpoint=T, iterations=0); message 202 is not printed after an endpoint root"
+note = "The listing's own comment (WHEN PRODUCT OF FX1*FX2 IS ZERO, X1 OR X2 IS A ROOT) states the intent. When both F(X1) and F(X2) are zero the original's output (both inputs reported as roots, X1 first) is kept; the trace value is X1."
+
+[[errata]]
 id = "structured-control-flow"
 kind = "modernization"
 original = "arithmetic IF (FX1*FX2) 1, 2, 3 / GO TO 30 / CALL EXIT; statement function F(X) = EXPF(-X) - SINF(...)"
