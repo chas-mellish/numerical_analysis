@@ -7,14 +7,18 @@ Each algorithm is a pure function returning a frozen result dataclass with ``val
 
 from gerald_na.algorithms._fortran_format import Rounding, format_e, format_es, format_f, format_i
 from gerald_na.algorithms.bisection import BisectionResult, BisectionStep, bisection
+from gerald_na.algorithms.romberg import RombergResult, RombergStep, romberg
 
 __all__ = [
     "BisectionResult",
     "BisectionStep",
+    "RombergResult",
+    "RombergStep",
     "Rounding",
     "bisection",
     "format_e",
     "format_es",
     "format_f",
     "format_i",
+    "romberg",
 ]

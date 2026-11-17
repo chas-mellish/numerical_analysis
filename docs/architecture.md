@@ -450,6 +450,18 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
    (Lagrange's `n` and its number of points), register an input generator in
    `CUSTOM_GENERATORS` of `python/tests/parity/test_parity.py`.
 
+### Program-specific notes
+
+* **ch03_p02 (Romberg), table and seed.** The `TABLE,row=..,col=..,value=..` records carry every
+  computed `TRAP(row, col)` (row = extrapolation order, col = halving index + 1) in the book's
+  printing order; the adapter rebuilds `RombergResult.table`, whose line `L` is
+  `TRAP(1..L, L)` as printed, and rejects missing, repeated or out-of-triangle cells. `STEP` is
+  one record per halving (`k` = 1..8), so `iterations` is the number of halvings and the table
+  has `iterations + 1` lines. Not meeting TOL after 8 extrapolations is a `RESULT` with
+  `converged=F` (exit status 0), as the book prints the table and a note. The seed
+  `SUM = 1. + FCN(B)` follows the Simpson convention: optional `f0` (default `f(0)`), with the
+  book's `1.0` passed by the adapter when the function normalizes to `SIN(X)/X`.
+
 ### Golden and parity tests
 
 * `python/tests/golden/test_golden.py` runs every catalog entry's data card on the Python engine,
