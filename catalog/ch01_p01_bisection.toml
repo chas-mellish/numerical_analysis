@@ -328,3 +328,10 @@ kind = "modernization"
 original = "arithmetic IF (FX1*FX2) 1, 2, 3 / GO TO 30 / CALL EXIT; statement function F(X) = EXPF(-X) - SINF(...)"
 corrected = "IF/SELECT CASE blocks, a DO loop with EXIT, STOP with exit status; F passed as a procedure argument (--preset N)"
 note = "Branch semantics are kept exactly, including the zero branches of every arithmetic IF; EXPF/SINF become EXP/SIN."
+
+[[errata]]
+id = "non-finite-values"
+kind = "modernization"
+original = "no check (the original machine had no IEEE infinities or NaN)"
+corrected = "F(X) returning NaN or +-Inf is an INPUT error (trace ERROR,code=INPUT with exit status 2; otherwise a message on stderr and exit status 1), keeping the rows already computed"
+note = "EXP(-X) overflows for X < -709 in real64 and X < -88 in real32, and a learner function may return NaN or Inf. Same rule as the Lagrange erratum of the same id."

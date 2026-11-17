@@ -299,3 +299,10 @@ kind = "modernization"
 original = "arithmetic IF / CALL EXIT; statement function F(X) = SINF(X)/X; READ 100 with FORMAT (F10.0, I10)"
 corrected = "IF blocks and STOP with an exit status; F passed as a procedure argument (--preset N); list-directed READ"
 note = "The order and grouping of every sum are kept: (1.0 + 4.*F(DELX)) + F(B), then (SUM + 2.*F(X)) + 4.*F(X+DELX) with X accumulated, then (DELX/3.)*SUM. This keeps both engines bit-identical and fixes the real32 digits."
+
+[[errata]]
+id = "non-finite-values"
+kind = "modernization"
+original = "no check (the original machine had no IEEE infinities or NaN)"
+corrected = "F(X) returning NaN or +-Inf is an INPUT error (trace ERROR,code=INPUT with exit status 2; otherwise a message on stderr and exit status 1), keeping the rows already computed"
+note = "The book's 1/(1+X**2) never does; a learner function may return NaN or Inf. Same rule as the Lagrange erratum of the same id."

@@ -179,10 +179,10 @@
 !  11 structured-control-flow (modernization): arithmetic IF / CALL EXIT /
 !     statement function / formatted READ modernized; order of summation
 !     kept. See D.
-!   Not a catalog id: non-finite function values. F returning NaN or +-Inf
-!   (for example 1/(1+X**2) never does, but a learner's function may) stops
-!   the run as an INPUT error (ERROR,code=INPUT in trace mode, a message on
-!   stderr and exit 1 otherwise), matching InputError on the Python engine.
+!  12 non-finite-values (modernization): F returning NaN or +-Inf (1/(1+X**2)
+!     never does, but a learner's function may) stops the run as an INPUT
+!     error (ERROR,code=INPUT in trace mode, a message on stderr and exit 1
+!     otherwise), matching InputError on the Python engine. See D.
 !===============================================================================
 program ch03_p01_simpson
    use, intrinsic :: iso_fortran_env, only: input_unit, output_unit, error_unit

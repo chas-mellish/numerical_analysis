@@ -352,3 +352,10 @@ kind = "modernization"
 original = "arithmetic IF (...) 50,50,20; statement function FCN(X) = SINF(X)/X; READ 100 (F10.0, E10.0); CALL EXIT"
 corrected = "IF block inside the DO loop; F passed as a procedure argument (--preset N); list-directed READ; normal end with exit status"
 note = "The operation order of every statement is kept with explicit parentheses ((X + H) + H, (H/2.)*SUM, (1./(4.**II - 1.))*(...)), so the Fortran and Python engines agree bit for bit. SINF/ABSF are SIN/ABS."
+
+[[errata]]
+id = "non-finite-values"
+kind = "modernization"
+original = "no check (the original machine had no IEEE infinities or NaN)"
+corrected = "F(X) returning NaN or +-Inf is an INPUT error (trace ERROR,code=INPUT with exit status 2; otherwise a message on stderr and exit status 1), keeping the rows already computed"
+note = "The book's SIN(X)/X never does; a learner function may return NaN or Inf. Same rule as the Lagrange erratum of the same id."

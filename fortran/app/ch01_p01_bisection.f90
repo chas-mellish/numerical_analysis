@@ -208,11 +208,11 @@
 !     EXIT became SELECT CASE, a DO loop and STOP with an exit status; F is a
 !     procedure argument (--preset N); EXPF/SINF/ABSF became EXP/SIN/ABS;
 !     every zero branch is kept. See D.
-!   Not a catalog id: non-finite function values. F returning NaN or +-Inf (for example
-!   EXP(-X) overflowing for X < -709 in real64, X < -88 in real32; impossible
-!   as IEEE specials on the original machine)
-!   stops the run as an INPUT error (ERROR,code=INPUT in trace mode, a message
-!   on stderr and exit 1 otherwise), matching InputError on the Python engine.
+!  11 non-finite-values (modernization): F returning NaN or +-Inf (for example
+!     EXP(-X) overflowing for X < -709 in real64, X < -88 in real32; impossible
+!     as IEEE specials on the original machine) stops the run as an INPUT error
+!     (ERROR,code=INPUT in trace mode, a message on stderr and exit 1
+!     otherwise), matching InputError on the Python engine. See D.
 !===============================================================================
 program ch01_p01_bisection
    use, intrinsic :: iso_fortran_env, only: input_unit, output_unit, error_unit

@@ -212,7 +212,9 @@
 !     a RESULT with converged=F, exit status 0. See C.
 !  13 structured-control-flow (modernization): arithmetic IF, statement
 !     function, CALL EXIT, fixed-column READ. See C.
-!   Not a catalog id: non-finite function values (INPUT error), see C.
+!  14 non-finite-values (modernization): F returning NaN or +-Inf stops the
+!     run as an INPUT error (ERROR,code=INPUT in trace mode, exit 1 with a
+!     message on stderr otherwise). See C.
 !===============================================================================
 program ch03_p02_romberg
    use, intrinsic :: iso_fortran_env, only: input_unit, output_unit, error_unit
