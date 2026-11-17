@@ -2,8 +2,8 @@
 !> comma-free trace messages.
 module test_book_format_suite
    use precision, only: wp
-   use book_format_mod, only: book_fixed, book_fixed_nearest, book_int, trace_real, trace_int, &
-      trace_logical, no_commas
+   use book_format_mod, only: book_fixed, book_fixed_nearest, book_e, fixed_leading_zero, &
+      book_int, trace_real, trace_int, trace_logical, no_commas
    use testdrive, only: new_unittest, unittest_type, error_type, check
    implicit none
    private
@@ -21,6 +21,9 @@ contains
          new_unittest("round_toward_zero", test_round_toward_zero), &
          new_unittest("round_to_nearest", test_round_to_nearest), &
          new_unittest("wide_values_unchanged", test_wide_values), &
+         new_unittest("book_e_chapter_4", test_book_e), &
+         new_unittest("book_e_zero_exponent_99", test_book_e_zero), &
+         new_unittest("fixed_leading_zero", test_fixed_leading_zero), &
          new_unittest("book_int", test_book_int), &
          new_unittest("trace_values", test_trace_values), &
          new_unittest("no_commas", test_no_commas) &
@@ -80,6 +83,62 @@ contains
       if (allocated(error)) return
       call check(error, book_fixed(1000.0_wp, 6, 3), "******")
    end subroutine test_wide_values
+
+   !> Chapter 4 `E` fields: one digit before the point (ES), RZ for computed values, RN for H.
+   subroutine test_book_e(error)
+      type(error_type), allocatable, intent(out) :: error
+
+      call check(error, book_e(0.010016675001984412_wp, 14, 7, "RZ"), " 1.0016675E-02")
+      if (allocated(error)) return
+      call check(error, book_e(2.010008336111607_wp, 14, 7, "RZ"), " 2.0100083E+00")
+      if (allocated(error)) return
+      call check(error, book_e(0.1_wp, 8, 1, "RN"), " 1.0E-01")
+      if (allocated(error)) return
+      ! RZ chops what RN rounds up: 9.99999999971E-13 and an H just below 1E-6.
+      call check(error, book_e(9.99999999971e-13_wp, 14, 7, "RZ"), " 9.9999999E-13")
+      if (allocated(error)) return
+      call check(error, book_e(9.99999999971e-13_wp, 14, 7, "RN"), " 1.0000000E-12")
+      if (allocated(error)) return
+      call check(error, book_e(0.99999_wp, 8, 1, "RN"), " 1.0E+00")
+      if (allocated(error)) return
+      call check(error, book_e(0.99999_wp, 8, 1, "RZ"), " 9.9E-01")
+      if (allocated(error)) return
+      call check(error, book_e(-4.05648195e1_wp, 14, 7, "RZ"), "-4.0564819E+01")
+      if (allocated(error)) return
+      ! A non-zero value whose exponent is +00 keeps it.
+      call check(error, book_e(1.5_wp, 14, 7, "RZ"), " 1.5000000E+00")
+   end subroutine test_book_e
+
+   !> An exact zero prints with the exponent E-99 (the book's 0.0000000E-99); -0 keeps its sign.
+   subroutine test_book_e_zero(error)
+      type(error_type), allocatable, intent(out) :: error
+
+      call check(error, book_e(0.0_wp, 14, 7, "RZ"), " 0.0000000E-99")
+      if (allocated(error)) return
+      call check(error, book_e(sign(0.0_wp, -1.0_wp), 14, 7, "RZ"), "-0.0000000E-99")
+      if (allocated(error)) return
+      call check(error, book_e(0.0_wp, 8, 1, "RN"), " 0.0E-99")
+   end subroutine test_book_e_zero
+
+   !> F5.2 of Chapter 4 keeps the leading zero ("AT X =  0.00"); RN echoes the card.
+   subroutine test_fixed_leading_zero(error)
+      type(error_type), allocatable, intent(out) :: error
+
+      call check(error, fixed_leading_zero(0.0_wp, 5, 2, "RN"), " 0.00")
+      if (allocated(error)) return
+      call check(error, fixed_leading_zero(-0.5_wp, 5, 2, "RN"), "-0.50")
+      if (allocated(error)) return
+      call check(error, fixed_leading_zero(0.29_wp, 5, 2, "RN"), " 0.29")
+      if (allocated(error)) return
+      call check(error, fixed_leading_zero(0.29_wp, 5, 2, "RZ"), " 0.28")
+      if (allocated(error)) return
+      call check(error, fixed_leading_zero(12.5_wp, 5, 2, "RN"), "12.50")
+      if (allocated(error)) return
+      call check(error, fixed_leading_zero(100.0_wp, 5, 2, "RN"), "*****")
+      if (allocated(error)) return
+      ! No room for the zero: the field stays as Fw.d prints it.
+      call check(error, fixed_leading_zero(-0.5_wp, 4, 2, "RN"), "-.50")
+   end subroutine test_fixed_leading_zero
 
    !> I3 as in FORMAT 203.
    subroutine test_book_int(error)

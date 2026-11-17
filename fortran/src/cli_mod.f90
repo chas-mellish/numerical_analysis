@@ -1,5 +1,5 @@
 !> Command-line flags shared by the drivers that take a function preset (bisection, Simpson,
-!> Romberg): `--trace`, `--verbose`, `--help`/`-h` and `--preset N` (or `--preset=N`), in any
+!> Romberg, central differences): `--trace`, `--verbose`, `--help`/`-h` and `--preset N` (or `--preset=N`), in any
 !> order. Bairstow and Lagrange take data rather than a function and keep their own parsers,
 !> which reject `--preset` with a program-specific message.
 !>

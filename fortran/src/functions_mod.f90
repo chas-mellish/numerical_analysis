@@ -18,6 +18,14 @@
 !>     2  EXP(-X**2)
 !>     3  1/(1+X**2)
 !>
+!>   Derivative presets (ch04_p01 central differences):
+!>     1  X**2*EXP(X)                      the book's function F(X) = X**2*EXPF(X)
+!>     2  SIN(X)
+!>     3  1 + LOG10(X)                     the table of p. 91, problem 2 (undefined for X <= 0)
+!>
+!> Preset ids are scoped per program family: each family has its own `get_*_preset` routine
+!> and `*_preset_count`, and a driver calls only the routine of its family.
+!>
 !> New presets are added by writing one pure function with the `real_function` interface and
 !> one `case` in the matching `get_*_preset` routine (plus the catalog entry).
 module functions_mod
@@ -26,9 +34,10 @@ module functions_mod
    private
 
    public :: real_function
-   public :: get_bisection_preset, get_quadrature_preset
+   public :: get_bisection_preset, get_quadrature_preset, get_derivative_preset
    public :: f_book_bisection, f_cubic, f_cos_minus_x
    public :: f_sinc, f_gauss, f_runge
+   public :: f_book_derivative, f_sin, f_one_plus_log10
 
    abstract interface
       !> A real function of one real variable in working precision.
@@ -46,6 +55,7 @@ module functions_mod
    !> Number of presets per family (valid ids are 1..count).
    integer, parameter, public :: bisection_preset_count = 3
    integer, parameter, public :: quadrature_preset_count = 3
+   integer, parameter, public :: derivative_preset_count = 3
 
    !> Fixed length of the preset expression strings (trimmed by callers).
    integer, parameter, public :: preset_expr_len = 64
@@ -109,6 +119,33 @@ contains
    end function f_runge
 
    ! ---------------------------------------------------------------------------------------
+   ! Derivative presets (central differences)
+   ! ---------------------------------------------------------------------------------------
+
+   !> Preset 1, the book's function: F(X) = X**2*EXPF(X) (EXPF is the FORTRAN II EXP).
+   !> X**2 with an integer exponent is X*X, as `gerald_na.expr` evaluates it.
+   pure function f_book_derivative(x) result(y)
+      real(wp), intent(in) :: x
+      real(wp) :: y
+      y = x**2*exp(x)
+   end function f_book_derivative
+
+   !> Preset 2: sin(x).
+   pure function f_sin(x) result(y)
+      real(wp), intent(in) :: x
+      real(wp) :: y
+      y = sin(x)
+   end function f_sin
+
+   !> Preset 3: 1 + log10(x), the table of book p. 91, problem 2. For x <= 0 the result is
+   !> -Inf or NaN, which the derivative module reports as an INPUT error.
+   pure function f_one_plus_log10(x) result(y)
+      real(wp), intent(in) :: x
+      real(wp) :: y
+      y = 1.0_wp + log10(x)
+   end function f_one_plus_log10
+
+   ! ---------------------------------------------------------------------------------------
    ! Preset selection
    ! ---------------------------------------------------------------------------------------
 
@@ -161,5 +198,30 @@ contains
          found = .false.
       end select
    end subroutine get_quadrature_preset
+
+   !> Select a derivative (central difference) preset. `found` is false for an unknown id.
+   subroutine get_derivative_preset(id, f, expr, found)
+      integer, intent(in) :: id
+      procedure(real_function), pointer, intent(out) :: f
+      character(len=preset_expr_len), intent(out) :: expr
+      logical, intent(out) :: found
+
+      found = .true.
+      select case (id)
+      case (1)
+         f => f_book_derivative
+         expr = "X**2*EXP(X)"
+      case (2)
+         f => f_sin
+         expr = "SIN(X)"
+      case (3)
+         f => f_one_plus_log10
+         expr = "1 + LOG10(X)"
+      case default
+         f => null()
+         expr = ""
+         found = .false.
+      end select
+   end subroutine get_derivative_preset
 
 end module functions_mod
