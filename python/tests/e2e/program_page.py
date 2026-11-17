@@ -3,7 +3,8 @@
 Everything is driven through ``data-testid`` attributes (docs/architecture.md, "Program page
 testids") and checked with Playwright's retrying locator assertions: the CSP forbids ``eval``, so
 string ``wait_for_function`` calls cannot be used. Expected values come from the catalog
-(``[[expected]]`` goldens and practice answers), never from the page under test.
+(``[[expected]]`` goldens and practice answers), never from the page under test; a row count the
+book did not print (so the catalog has no ``iterations`` golden) comes from the Python engine.
 """
 
 import math
@@ -12,6 +13,7 @@ from dataclasses import dataclass
 
 from playwright.sync_api import Locator, Page, expect
 
+from gerald_na.engines import PythonEngine, RunRequest
 from gerald_na.registry import CatalogEntry
 from gerald_na.registry.models import PracticeQuestion
 from gerald_na.web.forms import default_form_values
@@ -51,7 +53,11 @@ def golden(entry: CatalogEntry) -> Golden:
             assert isinstance(expected.book_value, int)
             rows = expected.book_value
     assert value is not None, f"{entry.id}: no [[expected]] result value"
-    assert rows is not None, f"{entry.id}: no [[expected]] iteration count"
+    if rows is None:
+        # the book did not print the count: take it from the Python engine on the book card
+        outcome = PythonEngine().run(entry, RunRequest.for_entry(entry))
+        assert outcome.result is not None, outcome.error
+        rows = int(outcome.result.iterations)
     return Golden(value, tolerance, rows)
 
 
