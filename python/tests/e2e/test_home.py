@@ -35,10 +35,12 @@ def test_home_lists_programs_by_chapter(page: Page) -> None:
 
     expect(page.get_by_test_id("chapter-1").locator("h2")).to_contain_text("Chapter 1")
     expect(page.get_by_test_id("chapter-3").locator("h2")).to_contain_text("Chapter 3")
+    expect(page.get_by_test_id("chapter-4").locator("h2")).to_contain_text("Chapter 4")
     unconfirmed = page.get_by_test_id("chapter-unconfirmed")
     expect(unconfirmed.locator("h2")).to_have_text("Book reference unconfirmed")
     expect(unconfirmed.get_by_test_id("program-card-lagrange_interpolation")).to_be_visible()
-    for chapter, program_ids in ((1, ("ch01_p01", "ch01_p02")), (3, ("ch03_p01", "ch03_p02"))):
+    chapters = ((1, ("ch01_p01", "ch01_p02")), (3, ("ch03_p01", "ch03_p02")), (4, ("ch04_p01",)))
+    for chapter, program_ids in chapters:
         section = page.get_by_test_id(f"chapter-{chapter}")
         expect(section.locator("[data-testid^='program-card-']")).to_have_count(len(program_ids))
         for program_id in program_ids:
