@@ -8,6 +8,7 @@
 #   make sync                  uv sync (Python package + dev tools into python/.venv)
 #   make test                  pytest (no browser tests) with coverage on algorithms + expr
 #   make test-parity           build the Fortran drivers, then run the cross-engine parity tests
+#   make test-golden           build both driver precisions, then run the golden (book) tests
 #   make lint                  ruff check, ruff format --check, mypy --strict
 #   make format                ruff format + ruff check --fix
 #   make e2e                   Playwright browser tests (installs Chromium if needed)
@@ -57,10 +58,10 @@ INSTALL_PREFIX := ../build
 SINGLE_PREFIX := ../build/single
 
 .PHONY: help build-fortran build-fortran-single build-fortran-flang test-fortran \
-	test-fortran-flang sync test test-parity lint format e2e serve readme-index clean
+	test-fortran-flang sync test test-parity test-golden lint format e2e serve readme-index clean
 
 help:
-	@sed -n '3,16p' Makefile
+	@sed -n '3,17p' Makefile
 
 build-fortran:
 	cd fortran && $(FPM) build --compiler $(FC) --flag "$(FFLAGS)" $(FPMFLAGS)
@@ -89,6 +90,9 @@ test:
 
 test-parity: build-fortran
 	$(UV_PY) run pytest tests/parity
+
+test-golden: build-fortran build-fortran-single
+	$(UV_PY) run pytest tests/golden
 
 lint:
 	$(UV_PY) run ruff check

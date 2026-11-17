@@ -125,7 +125,7 @@ jobs:
           if-no-files-found: ignore
 
   parity:
-    name: Cross-engine parity (Python vs Fortran)
+    name: Golden (real64 + SINGLE) and cross-engine parity
     needs: fortran-gfortran
     runs-on: ubuntu-24.04
     steps:
@@ -147,8 +147,12 @@ jobs:
         run: find build -path '*/bin/*' -type f -exec chmod +x {} +
       - *setup-uv
       - run: uv --directory python sync --frozen
-      - name: Parity tests
-        run: uv --directory python run pytest tests/parity
+      - name: Check the downloaded drivers (Fortran cases must not skip)
+        run: |
+          test -n "$(ls -A build/bin)"
+          test -n "$(ls -A build/single/bin)"
+      - name: Golden (book fidelity, real64 + SINGLE) and parity tests
+        run: uv --directory python run pytest -rs tests/golden tests/parity
 
   e2e:
     name: Playwright e2e
