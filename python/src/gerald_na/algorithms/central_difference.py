@@ -93,7 +93,7 @@ BOOK_ZERO_EXPONENT = "E-99"
 """How the book prints the exponent of an exact zero (``0.0000000E-99``)."""
 
 _ROUNDING = Rounding.ZERO
-"""The book's output conversion truncates (H, DX and DDX)."""
+"""The book's output conversion truncates DX and DDX (X and H use ``_ECHO_ROUNDING``)."""
 
 _ECHO_ROUNDING = Rounding.NEAREST
 """X and H are rounded to nearest (see the module docstring)."""
