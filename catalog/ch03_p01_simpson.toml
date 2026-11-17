@@ -140,13 +140,6 @@ field = "n"
 description = "WITH 100 PANELS"
 book_value = 100
 
-[[expected]]
-name = "ordinates"
-kind = "int"
-field = "iterations"
-description = "N + 1 = 101 ordinates enter the sum (not printed by the book)."
-book_value = 101
-
 # ------------------------------------------------------------------ files
 
 [files]

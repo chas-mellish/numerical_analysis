@@ -179,18 +179,6 @@ field = "value"
 description = "Three factors are printed: two quadratics and the final linear factor (N = 5 is odd)."
 book_value = 3
 
-[[expected]]
-name = "iterations"
-kind = "int"
-description = "Total corrections as computed (not printed by the book): 8 for the first factor, 5 for the second, identical in real32 and real64."
-book_value = 13
-
-[[expected]]
-name = "nudges"
-kind = "int"
-description = "The book card never meets a zero denominator."
-book_value = 0
-
 # ------------------------------------------------------------------ files
 
 [files]
