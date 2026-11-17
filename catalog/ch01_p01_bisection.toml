@@ -17,7 +17,9 @@ book_ref_confirmed = true
 precision_notes = """
 The book ran in single precision on 1970s hardware. Every midpoint X is a dyadic fraction
 (a multiple of 2**-k), so X is exact in both real32 and real64 and the 15 midpoints agree bit for bit;
-only F(X) differs, by about 1e-7 (row 15: 9.99e-7 in real64, 1.07e-6 in real32, both printed .000001).
+only F(X) differs, by about 1e-7 (row 15: 9.99e-7 in real64, 1.07e-6 in real32; the scan prints
+.000001, which the real32 book text reproduces but the real64 book text, rounding toward zero,
+prints as .000000: see erratum precision-last-digit).
 Both precisions therefore stop after the same 15 iterations, at X = 0.443572998046875.
 
 The line printer truncated rather than rounded the last printed digit and suppressed the leading
@@ -335,3 +337,10 @@ kind = "modernization"
 original = "no check (the original machine had no IEEE infinities or NaN)"
 corrected = "F(X) returning NaN or +-Inf is an INPUT error (trace ERROR,code=INPUT with exit status 2; otherwise a message on stderr and exit status 1), keeping the rows already computed"
 note = "EXP(-X) overflows for X < -709 in real64 and X < -88 in real32, and a learner function may return NaN or Inf. Same rule as the Lagrange erratum of the same id."
+
+[[errata]]
+id = "precision-last-digit"
+kind = "original_quirk"
+original = "row 15: AT X = .4435729 F(X) = .000001; row 11: AT X = .4438476 F(X) = -.000506 (scan)"
+corrected = "real64 book text prints row 15 as F(X) = .000000 (F = 9.989E-7, rounded toward zero); real32 book text prints row 11 as F(X) = -.000505 (F = -5.0598E-4)"
+note = "The book's machine (not identified) produced one more unit in the last digit than IEEE arithmetic does for these two values. Every F(X) still agrees with the book within 1E-6, so the golden tests pass; only the text differs."

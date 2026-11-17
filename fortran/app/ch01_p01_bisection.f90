@@ -213,6 +213,9 @@
 !     as IEEE specials on the original machine) stops the run as an INPUT error
 !     (ERROR,code=INPUT in trace mode, a message on stderr and exit 1
 !     otherwise), matching InputError on the Python engine. See D.
+!  12 precision-last-digit (original_quirk): real64 row 15 prints .000000
+!     (scan .000001) and real32 row 11 prints -.000505 (scan -.000506); the
+!     F(X) values agree with the book within 1E-6. See E.
 !===============================================================================
 program ch01_p01_bisection
    use, intrinsic :: iso_fortran_env, only: input_unit, output_unit, error_unit
