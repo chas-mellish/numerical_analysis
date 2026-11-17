@@ -57,6 +57,7 @@ class PythonEngine(Engine):
     def run(self, entry: CatalogEntry, request: RunRequest) -> RunOutcome:
         inputs, preset_id = validate_request(entry, request)
         adapter = get_adapter(entry.id)
+        adapter.check_inputs(entry, inputs)
         function = compile_function(entry, preset_id, request.expression)
         start = time.perf_counter()
         result: Any = None

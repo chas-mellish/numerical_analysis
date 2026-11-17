@@ -9,17 +9,22 @@ from collections.abc import Mapping
 from types import MappingProxyType
 
 from gerald_na.engines.adapters.bisection import BisectionAdapter
+from gerald_na.engines.adapters.lagrange import LagrangeAdapter
 from gerald_na.engines.programs import ProgramAdapter
 from gerald_na.errors import EngineUnavailableError
 
 __all__ = [
     "BisectionAdapter",
+    "LagrangeAdapter",
     "adapters",
     "get_adapter",
     "register_adapter",
 ]
 
-_BUILTIN: tuple[ProgramAdapter, ...] = (BisectionAdapter(),)
+_BUILTIN: tuple[ProgramAdapter, ...] = (
+    BisectionAdapter(),
+    LagrangeAdapter(),
+)
 
 _ADAPTERS: dict[str, ProgramAdapter] = {adapter.program_id: adapter for adapter in _BUILTIN}
 

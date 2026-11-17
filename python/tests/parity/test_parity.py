@@ -95,6 +95,47 @@ def generic_inputs(entry: CatalogEntry, rng: random.Random) -> Inputs:
     return {item.name: _random_value(item, rng, near) for item in entry.inputs}
 
 
+def lagrange_inputs(entry: CatalogEntry, rng: random.Random) -> Inputs:
+    """``lagrange_interpolation``: ``n`` in 1..10 and exactly ``n`` well-spaced pairs.
+
+    Half the sets lie around the book's data (X in [2, 9], Y = ASINH-like values), half anywhere
+    in the catalog range at scales from 1e-2 to 1e5. Nodes are a jittered grid (distinct and
+    well spaced) in random order; XIN ranges a quarter span beyond the nodes (extrapolation).
+    About one set in ten repeats an X value, exercising the INPUT error on both engines.
+    """
+    item = entry.input("points")
+    low, high = _bounds(item, 0.0)
+    n = rng.randint(1, 10)
+    if rng.random() < 0.5:
+        lo, hi = 2.0, 9.0
+    else:
+        span = 10.0 ** rng.uniform(-2.0, 5.0)
+        lo = rng.uniform(low / 2.0, high / 2.0)
+        hi = lo + span
+    h = (hi - lo) / max(n - 1, 1)
+    xs = [lo + (k + rng.uniform(-0.3, 0.3)) * h for k in range(n)]
+    rng.shuffle(xs)
+    scale = 10.0 ** rng.uniform(-1.0, 3.0)
+    ys = [rng.uniform(-scale, scale) for _ in range(n)]
+    if n >= 2 and rng.random() < 0.1:
+        i, j = rng.sample(range(n), 2)
+        xs[j] = xs[i]
+    width = max(hi - lo, 1.0)
+    xin = rng.uniform(lo - width / 4.0, hi + width / 4.0)
+
+    def clamp(value: float) -> float:
+        return float(min(max(value, low), high))
+
+    return {
+        "n": n,
+        "points": [[clamp(x), clamp(y)] for x, y in zip(xs, ys, strict=True)],
+        "xin": clamp(xin),
+    }
+
+
+CUSTOM_GENERATORS["lagrange_interpolation"] = lagrange_inputs
+
+
 def input_sets(entry: CatalogEntry) -> Iterator[tuple[str, Inputs]]:
     """The data card and ``RANDOM_CASES`` reproducible random input sets."""
     yield "card", dict(entry.data_card.values)
@@ -208,3 +249,15 @@ def test_random_inputs_cover_both_outcomes() -> None:
     }
     assert "OK" in statuses
     assert statuses - {"OK"}, statuses
+
+
+def test_lagrange_random_inputs_cover_both_outcomes() -> None:
+    """Coupled Lagrange inputs: consistent n, mostly successes, some duplicate-X errors."""
+    entry = get_registry().get("lagrange_interpolation")
+    outcomes = [
+        PythonEngine().run(entry, RunRequest.for_entry(entry, inputs))
+        for _, inputs in input_sets(entry)
+    ]
+    statuses = {outcome.status for outcome in outcomes}
+    assert statuses == {"OK", "INPUT"}, statuses
+    assert {outcome.inputs["n"] for outcome in outcomes} >= {1, 10}
