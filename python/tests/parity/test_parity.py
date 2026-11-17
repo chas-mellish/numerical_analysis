@@ -14,7 +14,8 @@ Inputs are generated per input type from a seed derived from the program id, hal
 the book data card (where the iterations are interesting) and half across the full catalog range
 (log-uniform for positive ranges spanning decades, such as tolerances). Programs whose inputs are
 coupled (for example Lagrange's ``n`` and its point count) register a generator in
-``CUSTOM_GENERATORS``. Skipped with the ``fortran`` marker when the drivers are not built.
+``CUSTOM_GENERATORS``. Only the engine-comparison test carries the ``fortran`` marker (skipped
+when the drivers are not built); the generator coverage tests run on the Python engine alone.
 """
 
 import math
@@ -29,8 +30,6 @@ import pytest
 from gerald_na.engines import FortranRunner, PythonEngine, RunOutcome, RunRequest, diff_outcomes
 from gerald_na.registry import CatalogEntry, CatalogInput, get_registry
 from gerald_na.settings import Settings
-
-pytestmark = pytest.mark.fortran
 
 REL_TOL = 1e-12
 RANDOM_CASES = 24
@@ -254,6 +253,7 @@ def assert_parity(entry: CatalogEntry, py: RunOutcome, ft: RunOutcome) -> None:
     assert py.book_text == ft.book_text
 
 
+@pytest.mark.fortran
 @pytest.mark.parametrize(("entry", "preset", "label", "inputs"), list(parity_cases()))
 def test_engines_agree(
     fortran: FortranRunner,

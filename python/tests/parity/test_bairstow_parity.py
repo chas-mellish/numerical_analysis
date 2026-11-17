@@ -13,8 +13,6 @@ from gerald_na.registry import get_registry
 from gerald_na.settings import Settings
 from tests.parity.test_parity import input_sets
 
-pytestmark = pytest.mark.fortran
-
 ENTRY = get_registry().get("ch01_p02")
 SINGULAR = {"a": [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -16.0], "n": 4}
 """x**4 - 16 from R = S = 0: DENOM is exactly zero, one nudge."""
@@ -31,6 +29,7 @@ def fortran() -> FortranRunner:
 CASES = [("singular", SINGULAR), *input_sets(ENTRY)]
 
 
+@pytest.mark.fortran
 @pytest.mark.parametrize(("label", "inputs"), CASES, ids=[label for label, _ in CASES])
 def test_verbose_text_agrees(fortran: FortranRunner, label: str, inputs: dict[str, object]) -> None:
     request = RunRequest.for_entry(ENTRY, inputs, verbose=True)
@@ -43,6 +42,7 @@ def test_verbose_text_agrees(fortran: FortranRunner, label: str, inputs: dict[st
         assert py.verbose_text == ft.verbose_text
 
 
+@pytest.mark.fortran
 def test_singular_card_nudges_on_both_engines(fortran: FortranRunner) -> None:
     request = RunRequest.for_entry(ENTRY, SINGULAR)
     for engine in (PythonEngine(), fortran):
