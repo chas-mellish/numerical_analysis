@@ -314,8 +314,8 @@ note = "Only the opposite-signs message went to the console typewriter in the or
 id = "truncated-digits"
 kind = "original_quirk"
 original = ".4414062, .4433593, .4438476, .4435424, .4435729 (printed)"
-corrected = "0.4414063, 0.4433594, 0.4438477, 0.4435425, 0.4435730 (gfortran F10.7 rounds)"
-note = "The 1970s line printer truncated the last digit and dropped the leading zero. Not a code change: the golden tests compare numbers within 1e-7 rather than text."
+corrected = "book text rendered with RZ (round toward zero) and without the leading zero: .4414062, .4433593, .4438476, .4435424, .4435729"
+note = "The 1970s line printer truncated the last digit and dropped the leading zero. Both engines reproduce the scan: the Fortran driver (book_fixed) and the Python port (Rounding.ZERO) round toward zero. A rounding formatter (gfortran F10.7) would print 0.4414063, 0.4433594, 0.4438477, 0.4435425, 0.4435730; the golden tests compare numbers within 1e-7 rather than text."
 
 [[errata]]
 id = "label-5-fall-through"
