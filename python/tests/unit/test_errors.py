@@ -14,7 +14,6 @@ from gerald_na.errors import (
     NonConvergenceError,
     OddPanelsError,
     ZeroProductError,
-    error_from_trace,
 )
 
 
@@ -57,15 +56,3 @@ def test_trace_codes_cover_algorithm_errors_only() -> None:
     }
     for code, cls in TRACE_ERROR_CODES.items():
         assert cls.code == code
-
-
-def test_error_from_trace_builds_typed_error() -> None:
-    error = error_from_trace("ZERO_PRODUCT", "ERROR.")
-    assert type(error) is ZeroProductError
-    assert error.message == "ERROR."
-
-
-def test_error_from_trace_rejects_unknown_codes() -> None:
-    error = error_from_trace("BOGUS", "something")
-    assert type(error) is FortranRunError
-    assert "BOGUS" in error.message

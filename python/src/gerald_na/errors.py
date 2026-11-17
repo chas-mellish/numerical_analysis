@@ -23,7 +23,6 @@ __all__ = [
     "NonConvergenceError",
     "OddPanelsError",
     "ZeroProductError",
-    "error_from_trace",
 ]
 
 
@@ -135,14 +134,3 @@ TRACE_ERROR_CODES: Mapping[str, type[GeraldNAError]] = MappingProxyType(
     }
 )
 """Map from the ``code=`` field of a trace ``ERROR`` record to the matching error class."""
-
-
-def error_from_trace(code: str, message: str) -> GeraldNAError:
-    """Build the typed error for an ``ERROR,code=<code>,message=<message>`` trace record.
-
-    Unknown codes are a protocol violation and yield a :class:`FortranRunError`.
-    """
-    cls = TRACE_ERROR_CODES.get(code)
-    if cls is None:
-        return FortranRunError(f"unknown trace error code {code!r}: {message}")
-    return cls(message)
