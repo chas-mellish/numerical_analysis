@@ -8,6 +8,7 @@ program tester
    use test_functions_suite, only: collect_functions
    use test_book_format_suite, only: collect_book_format
    use test_bisection_suite, only: collect_bisection
+   use test_simpson_suite, only: collect_simpson
    implicit none
    integer :: stat, is
    type(testsuite_type), allocatable :: testsuites(:)
@@ -19,7 +20,8 @@ program tester
       new_testsuite("precision", collect_precision), &
       new_testsuite("functions", collect_functions), &
       new_testsuite("book_format", collect_book_format), &
-      new_testsuite("bisection", collect_bisection) &
+      new_testsuite("bisection", collect_bisection), &
+      new_testsuite("simpson", collect_simpson) &
    ]
 
    do is = 1, size(testsuites)
