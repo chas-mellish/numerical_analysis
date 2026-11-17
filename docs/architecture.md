@@ -552,8 +552,8 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
 * The adapter writes the book's card layout (`05`, one pair per line, XIN) and reports
   `n != len(points)` from `input_problems` (keyed by `n`: the web form marks that field and the
   API lists it in `fields`); the parity generator `lagrange_inputs` draws consistent, well-spaced data.
-* `gerald_na.algorithms.lagrange.lagrange_curve` samples the interpolant for the `interpolant`
-  chart (nodes, curve, and the evaluated point).
+* The `interpolant` chart (nodes, curve, and the evaluated point) is sampled by the generic
+  chart builder in `gerald_na.web.charts` from the result's nodes.
 
 ### Golden and parity tests
 

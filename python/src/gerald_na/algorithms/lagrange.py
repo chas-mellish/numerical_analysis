@@ -55,7 +55,6 @@ __all__ = [
     "LagrangeResult",
     "LagrangeStep",
     "lagrange",
-    "lagrange_curve",
     "msg_degree",
     "msg_duplicate_x",
     "msg_not_finite",
@@ -209,29 +208,3 @@ def lagrange(xs: Sequence[float], ys: Sequence[float], xin: float) -> LagrangeRe
         ys=y,
         xin=xin,
     )
-
-
-def lagrange_curve(
-    xs: Sequence[float],
-    ys: Sequence[float],
-    *,
-    samples: int = 101,
-    lo: float | None = None,
-    hi: float | None = None,
-) -> tuple[tuple[float, float], ...]:
-    """``samples`` points ``(x, P(x))`` of the interpolating polynomial, for charts.
-
-    The range defaults to the span of ``xs``; pass ``lo``/``hi`` to include an extrapolated
-    XIN. Every value is computed by :func:`lagrange`, so the curve passes through the nodes.
-    """
-    if samples < 2:
-        raise InputError(f"samples must be at least 2, got {samples}")
-    if not xs:
-        raise DegreeError(msg_degree(0))
-    start = min(xs) if lo is None else float(lo)
-    stop = max(xs) if hi is None else float(hi)
-    if start == stop:
-        return ((start, lagrange(xs, ys, start).value),)
-    step = (stop - start) / (samples - 1)
-    points = [start + k * step for k in range(samples - 1)] + [stop]
-    return tuple((x, lagrange(xs, ys, x).value) for x in points)

@@ -17,7 +17,7 @@ from hypothesis import strategies as st
 from scipy.interpolate import BarycentricInterpolator
 from scipy.interpolate import lagrange as scipy_lagrange
 
-from gerald_na.algorithms import LagrangeResult, LagrangeStep, Rounding, lagrange, lagrange_curve
+from gerald_na.algorithms import LagrangeResult, LagrangeStep, Rounding, lagrange
 from gerald_na.algorithms.lagrange import (
     BOOK_MAX_POINTS,
     msg_degree,
@@ -175,28 +175,6 @@ def test_overflow_is_input_error_with_completed_rows() -> None:
     assert info.value.message == msg_not_finite(2)
     assert len(info.value.steps) == 1
     assert info.value.book_output == ""
-
-
-def test_curve_passes_through_the_nodes() -> None:
-    curve = lagrange_curve(BOOK_X, BOOK_Y, samples=11)
-    assert len(curve) == 11
-    assert curve[0][0] == BOOK_X[0]
-    assert curve[0][1] == pytest.approx(BOOK_Y[0], abs=1e-14)
-    assert curve[-1][0] == BOOK_X[-1]
-    assert curve[-1][1] == pytest.approx(BOOK_Y[-1], abs=1e-14)
-    xs = [x for x, _ in curve]
-    assert xs == sorted(xs)
-    wide = lagrange_curve(BOOK_X, BOOK_Y, samples=3, lo=0.0, hi=10.0)
-    assert [x for x, _ in wide] == [0.0, 5.0, 10.0]
-    assert wide[1][1] == REAL64_VALUE
-    assert lagrange_curve([2.0], [3.0]) == ((2.0, 3.0),)
-
-
-def test_curve_rejects_bad_arguments() -> None:
-    with pytest.raises(InputError):
-        lagrange_curve(BOOK_X, BOOK_Y, samples=1)
-    with pytest.raises(DegreeError):
-        lagrange_curve([], [])
 
 
 # ---------------------------------------------------------------- properties (Hypothesis)

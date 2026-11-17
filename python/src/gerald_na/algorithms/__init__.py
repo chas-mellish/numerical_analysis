@@ -14,7 +14,7 @@ from gerald_na.algorithms.bairstow import (
     factor_roots,
 )
 from gerald_na.algorithms.bisection import BisectionResult, BisectionStep, bisection
-from gerald_na.algorithms.lagrange import LagrangeResult, LagrangeStep, lagrange, lagrange_curve
+from gerald_na.algorithms.lagrange import LagrangeResult, LagrangeStep, lagrange
 from gerald_na.algorithms.romberg import RombergResult, RombergStep, romberg
 from gerald_na.algorithms.simpson import SimpsonResult, SimpsonStep, simpson
 
@@ -39,7 +39,6 @@ __all__ = [
     "format_f",
     "format_i",
     "lagrange",
-    "lagrange_curve",
     "romberg",
     "simpson",
 ]
