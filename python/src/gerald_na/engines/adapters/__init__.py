@@ -12,6 +12,7 @@ from gerald_na.engines.adapters.bairstow import BairstowAdapter
 from gerald_na.engines.adapters.bisection import BisectionAdapter
 from gerald_na.engines.adapters.simpson import SimpsonAdapter
 from gerald_na.engines.adapters.romberg import RombergAdapter
+from gerald_na.engines.adapters.lagrange import LagrangeAdapter
 from gerald_na.engines.programs import ProgramAdapter
 from gerald_na.errors import EngineUnavailableError
 
@@ -20,6 +21,7 @@ __all__ = [
     "BisectionAdapter",
     "SimpsonAdapter",
     "RombergAdapter",
+    "LagrangeAdapter",
     "adapters",
     "get_adapter",
     "register_adapter",
@@ -30,6 +32,7 @@ _BUILTIN: tuple[ProgramAdapter, ...] = (
     BairstowAdapter(),
     SimpsonAdapter(),
     RombergAdapter(),
+    LagrangeAdapter(),
 )
 
 _ADAPTERS: dict[str, ProgramAdapter] = {adapter.program_id: adapter for adapter in _BUILTIN}

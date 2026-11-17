@@ -124,6 +124,15 @@ class ProgramAdapter(ABC):
     ) -> Any:
         """Call the Python algorithm. ``function`` is ``None`` for data-only programs."""
 
+    def check_inputs(self, entry: CatalogEntry, inputs: Mapping[str, InputValue]) -> None:
+        """Cross-input checks the per-input catalog bounds cannot express (default: none).
+
+        Both engines call this after :func:`~gerald_na.engines.base.validate_request` and before
+        anything runs, so a violation is a request problem (:class:`InputError`) on either
+        engine, for example Lagrange's ``n`` not matching its number of points.
+        """
+        return None
+
     def data_card(self, entry: CatalogEntry, inputs: Mapping[str, InputValue]) -> str:
         """The stdin text for the Fortran driver (default: :func:`serialize_card`)."""
         return serialize_card(entry, inputs)

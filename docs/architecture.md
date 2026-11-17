@@ -441,6 +441,10 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
      steps from `self.steps_from_trace(entry, trace)` and other records (for example
      `trace.of_type("TABLE")` for the Romberg table, `trace.of_type("FACTOR")` for Bairstow), and
      raise `FortranRunError` on inconsistent records;
+   * optionally override `check_inputs(entry, inputs)` for constraints between inputs that the
+     per-input bounds cannot express; both engines call it after request validation and before
+     anything runs, so a violation raises `InputError` on either engine (Lagrange: `n` must
+     equal the number of points);
    * optionally override `data_card(entry, inputs)` when the driver's `READ` statements need a
      layout other than the generic one (one line per catalog `card`, numbers with `repr`
      precision, every `point_list` pair on its own line), `steps_from_trace` when the `STEP`
@@ -469,6 +473,18 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
   `converged=F` (exit status 0), as the book prints the table and a note. The seed
   `SUM = 1. + FCN(B)` follows the Simpson convention: optional `f0` (default `f(0)`), with the
   book's `1.0` passed by the adapter when the function normalizes to `SIN(X)/X`.
+### Program notes: `lagrange_interpolation`
+
+* No scan exists; the listing was transcribed from the OCR text only, and the corrections are
+  justified by syntax, the FORMAT Hollerith counts and the printed 2.3119 (see the catalog
+  errata). The pairs are X(I), Y(I) in READ order (verified numerically).
+* The driver reads the whole of stdin and parses it list-directed, so N is checked against
+  `DIMENSION X(10), Y(10)` (`DEGREE`) before the pairs are read and any card layout works.
+  Equal X values (a division by zero in the original) are an `INPUT` error on both engines.
+* The adapter writes the book's card layout (`05`, one pair per line, XIN) and checks
+  `n == len(points)`; the parity generator `lagrange_inputs` draws consistent, well-spaced data.
+* `gerald_na.algorithms.lagrange.lagrange_curve` samples the interpolant for the `interpolant`
+  chart (nodes, curve, and the evaluated point).
 
 ### Golden and parity tests
 

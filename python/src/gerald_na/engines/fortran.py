@@ -283,6 +283,7 @@ class FortranRunner(Engine):
             )
         inputs, preset_id = validate_request(entry, request)
         adapter = get_adapter(entry.id)
+        adapter.check_inputs(entry, inputs)
         self.executable_path(entry)  # EngineUnavailableError before anything runs
         card = adapter.data_card(entry, inputs)
         start = time.perf_counter()
