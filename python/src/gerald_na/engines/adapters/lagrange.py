@@ -21,6 +21,7 @@ from types import MappingProxyType
 from typing import ClassVar
 
 from gerald_na.algorithms.lagrange import LagrangeResult, LagrangeStep, lagrange
+from gerald_na.engines.adapters._common import int_input, real_input
 from gerald_na.engines.programs import Function, ProgramAdapter, card_number
 from gerald_na.engines.trace import Trace
 from gerald_na.errors import FortranRunError
@@ -30,13 +31,6 @@ from gerald_na.registry.models import InputValue
 __all__ = ["LagrangeAdapter"]
 
 
-def _count(inputs: Mapping[str, InputValue]) -> int:
-    value = inputs["n"]
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise TypeError(f"input 'n' must be an integer, got {value!r}")
-    return value
-
-
 def _points(inputs: Mapping[str, InputValue]) -> tuple[tuple[float, float], ...]:
     value = inputs["points"]
     if not isinstance(value, tuple) or not all(
@@ -44,13 +38,6 @@ def _points(inputs: Mapping[str, InputValue]) -> tuple[tuple[float, float], ...]
     ):
         raise TypeError(f"input 'points' must be a list of (x, y) pairs, got {value!r}")
     return tuple((float(point[0]), float(point[1])) for point in value)  # type: ignore[index]
-
-
-def _real(inputs: Mapping[str, InputValue], name: str) -> float:
-    value = inputs[name]
-    if not isinstance(value, int | float):
-        raise TypeError(f"input {name!r} must be a number, got {value!r}")
-    return float(value)
 
 
 class LagrangeAdapter(ProgramAdapter):
@@ -64,7 +51,7 @@ class LagrangeAdapter(ProgramAdapter):
     def input_problems(
         self, entry: CatalogEntry, inputs: Mapping[str, InputValue]
     ) -> dict[str, str]:
-        n, points = _count(inputs), _points(inputs)
+        n, points = int_input(inputs, "n"), _points(inputs)
         if n != len(points):
             return {
                 "n": f"input 'n' is {n} but 'points' has {len(points)} pairs: "
@@ -78,13 +65,13 @@ class LagrangeAdapter(ProgramAdapter):
         if function is not None:
             raise TypeError("lagrange takes data, not a function")
         points = _points(inputs)
-        return lagrange([x for x, _ in points], [y for _, y in points], _real(inputs, "xin"))
+        return lagrange([x for x, _ in points], [y for _, y in points], real_input(inputs, "xin"))
 
     def data_card(self, entry: CatalogEntry, inputs: Mapping[str, InputValue]) -> str:
-        n = _count(inputs)
+        n = int_input(inputs, "n")
         lines = [f"{n:02d}" if 0 <= n <= 99 else str(n)]  # I2, as on the book's card "05"
         lines.extend(f"{card_number(x)} {card_number(y)}" for x, y in _points(inputs))
-        lines.append(card_number(_real(inputs, "xin")))
+        lines.append(card_number(real_input(inputs, "xin")))
         return "".join(line + "\n" for line in lines)
 
     def result_from_trace(
@@ -108,8 +95,8 @@ class LagrangeAdapter(ProgramAdapter):
             converged=record.logical("converged"),
             iterations=iterations,
             steps=tuple(steps),
-            n=_count(inputs),
+            n=int_input(inputs, "n"),
             xs=tuple(x for x, _ in points),
             ys=tuple(y for _, y in points),
-            xin=_real(inputs, "xin"),
+            xin=real_input(inputs, "xin"),
         )

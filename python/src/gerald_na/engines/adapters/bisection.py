@@ -18,6 +18,7 @@ from gerald_na.algorithms.bisection import (
     BisectionStep,
     bisection,
 )
+from gerald_na.engines.adapters._common import real_input
 from gerald_na.engines.programs import Function, ProgramAdapter
 from gerald_na.engines.trace import Trace
 from gerald_na.errors import FortranRunError
@@ -25,13 +26,6 @@ from gerald_na.registry import CatalogEntry
 from gerald_na.registry.models import InputValue
 
 __all__ = ["BisectionAdapter"]
-
-
-def _real(inputs: Mapping[str, InputValue], name: str) -> float:
-    value = inputs[name]
-    if not isinstance(value, int | float):
-        raise TypeError(f"input {name!r} must be a number, got {value!r}")
-    return float(value)
 
 
 class BisectionAdapter(ProgramAdapter):
@@ -48,9 +42,9 @@ class BisectionAdapter(ProgramAdapter):
             raise TypeError("bisection needs a function")
         return bisection(
             function,
-            _real(inputs, "x1"),
-            _real(inputs, "x2"),
-            _real(inputs, "tol"),
+            real_input(inputs, "x1"),
+            real_input(inputs, "x2"),
+            real_input(inputs, "tol"),
             max_iter=BOOK_MAX_ITER,
         )
 
@@ -74,9 +68,9 @@ class BisectionAdapter(ProgramAdapter):
             iterations=iterations,
             steps=tuple(steps),
             root_at_endpoint=root_at_endpoint,
-            x1=_real(inputs, "x1"),
-            x2=_real(inputs, "x2"),
-            tol=_real(inputs, "tol"),
+            x1=real_input(inputs, "x1"),
+            x2=real_input(inputs, "x2"),
+            tol=real_input(inputs, "tol"),
             max_iter=BOOK_MAX_ITER,
             fx1=record.real("fx1"),
             fx2=record.real("fx2"),

@@ -21,6 +21,7 @@ from gerald_na.algorithms.bairstow import (
     FactorKind,
     bairstow,
 )
+from gerald_na.engines.adapters._common import int_input, real_input
 from gerald_na.engines.programs import Function, ProgramAdapter
 from gerald_na.engines.trace import Record, Trace
 from gerald_na.errors import FortranRunError
@@ -37,20 +38,6 @@ _FACTOR_KEYS: dict[str, tuple[str, ...]] = {
     "final_quadratic": ("a2", "a1", "a0"),
     "linear": ("a1", "a0"),
 }
-
-
-def _real(inputs: Mapping[str, InputValue], name: str) -> float:
-    value = inputs[name]
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        raise TypeError(f"input {name!r} must be a number, got {value!r}")
-    return float(value)
-
-
-def _int(inputs: Mapping[str, InputValue], name: str) -> int:
-    value = inputs[name]
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise TypeError(f"input {name!r} must be an integer, got {value!r}")
-    return value
 
 
 def _coefficients(inputs: Mapping[str, InputValue]) -> tuple[float, ...]:
@@ -86,11 +73,11 @@ class BairstowAdapter(ProgramAdapter):
     ) -> BairstowResult:
         return bairstow(
             _coefficients(inputs),
-            _real(inputs, "r1"),
-            _real(inputs, "s1"),
-            _real(inputs, "test"),
-            _int(inputs, "lim"),
-            _int(inputs, "n"),
+            real_input(inputs, "r1"),
+            real_input(inputs, "s1"),
+            real_input(inputs, "test"),
+            int_input(inputs, "lim"),
+            int_input(inputs, "n"),
         )
 
     def result_from_trace(
@@ -117,11 +104,11 @@ class BairstowAdapter(ProgramAdapter):
             steps=tuple(steps),
             factors=factors,
             coeffs=_coefficients(inputs),
-            r1=_real(inputs, "r1"),
-            s1=_real(inputs, "s1"),
-            test=_real(inputs, "test"),
-            lim=_int(inputs, "lim"),
-            n=_int(inputs, "n"),
+            r1=real_input(inputs, "r1"),
+            s1=real_input(inputs, "s1"),
+            test=real_input(inputs, "test"),
+            lim=int_input(inputs, "lim"),
+            n=int_input(inputs, "n"),
             nudges=record.integer("nudges"),
         )
 
