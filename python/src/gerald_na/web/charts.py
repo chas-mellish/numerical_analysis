@@ -480,7 +480,7 @@ def convergence_figures(data: ChartInput) -> list[Figure]:
                     "%{y:.3e}<extra></extra>",
                 )
             )
-        title = "Change from one row to the next (log scale)"
+        title = "Row-to-row change (log)"
         layout = _layout(title, x_label, "|y(next row) - y(row)|")
         if log_x:
             _log_axis(layout["xaxis"])
