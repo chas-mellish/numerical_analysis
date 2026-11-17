@@ -6,13 +6,25 @@ Each algorithm is a pure function returning a frozen result dataclass with ``val
 """
 
 from gerald_na.algorithms._fortran_format import Rounding, format_e, format_es, format_f, format_i
+from gerald_na.algorithms.bairstow import (
+    BairstowFactor,
+    BairstowResult,
+    BairstowStep,
+    bairstow,
+    factor_roots,
+)
 from gerald_na.algorithms.bisection import BisectionResult, BisectionStep, bisection
 
 __all__ = [
+    "BairstowFactor",
+    "BairstowResult",
+    "BairstowStep",
     "BisectionResult",
     "BisectionStep",
     "Rounding",
+    "bairstow",
     "bisection",
+    "factor_roots",
     "format_e",
     "format_es",
     "format_f",

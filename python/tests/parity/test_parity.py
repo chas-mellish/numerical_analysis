@@ -46,6 +46,41 @@ CUSTOM_GENERATORS: dict[str, Generator] = {}
 """Program id -> input generator, for programs whose inputs constrain each other."""
 
 
+def bairstow_inputs(entry: CatalogEntry, rng: random.Random) -> Inputs:
+    """ch01_p02: the coefficients above X**N must be zero, so they are drawn with N.
+
+    Mostly valid cards (roots-based or arbitrary coefficients, degree 2..6), plus a few DEGREE
+    cases (N out of range, or a nonzero coefficient above X**N) and tight LIMs.
+    """
+    n = rng.randint(2, 6)
+    if rng.random() < 0.5:
+        roots = [rng.uniform(-6.0, 6.0) for _ in range(n)]
+        poly = [1.0]
+        for root in roots:  # multiply by (x - root)
+            poly = [a - root * b for a, b in zip([*poly, 0.0], [0.0, *poly], strict=True)]
+        lead = rng.choice([1.0, -2.0, 0.5])
+        coefficients = [lead * c for c in poly]
+    else:
+        coefficients = [rng.uniform(-100.0, 100.0) for _ in range(n + 1)]
+    a = [0.0] * (6 - n) + coefficients
+    roll = rng.random()
+    if roll < 0.08:
+        n = rng.choice([0, 1, 7, 12])
+    elif roll < 0.16 and n < 6:
+        a[rng.randint(0, 5 - n)] = rng.uniform(-5.0, 5.0)
+    return {
+        "a": a,
+        "r1": rng.uniform(-3.0, 3.0) if rng.random() < 0.7 else 0.0,
+        "s1": rng.uniform(-3.0, 3.0) if rng.random() < 0.7 else 0.0,
+        "test": float(10.0 ** rng.uniform(-10.0, -2.0)),
+        "lim": rng.choice([rng.randint(1, 8), rng.randint(20, 80)]),
+        "n": n,
+    }
+
+
+CUSTOM_GENERATORS["ch01_p02"] = bairstow_inputs
+
+
 def _bounds(item: CatalogInput, default: float) -> tuple[float, float]:
     spread = 10.0 * max(1.0, abs(default))
     low = item.min if item.min is not None else default - spread
