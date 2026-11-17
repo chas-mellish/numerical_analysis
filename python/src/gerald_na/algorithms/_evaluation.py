@@ -8,9 +8,9 @@ from gerald_na.errors import InputError
 __all__ = ["evaluate_finite"]
 
 
-def evaluate_finite(f: Callable[[float], float], x: float) -> float:
-    """``f(x)`` as a float; a NaN or infinite value is an :class:`InputError`."""
+def evaluate_finite(f: Callable[[float], float], x: float, name: str = "F(X)") -> float:
+    """``f(x)`` as a float; a NaN or infinite value is an :class:`InputError` naming ``name``."""
     value = float(f(x))
     if not math.isfinite(value):
-        raise InputError(f"F(X) is not a finite number at X = {x!r}")
+        raise InputError(f"{name} is not a finite number at X = {x!r}")
     return value

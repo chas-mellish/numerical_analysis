@@ -62,6 +62,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from gerald_na.algorithms._evaluation import evaluate_finite
 from gerald_na.algorithms._fortran_format import Rounding, format_es, format_f, render_records
 from gerald_na.errors import GeraldNAError, InputError
 
@@ -222,12 +223,9 @@ def central_difference(
 
     def evaluate(at: float, name: str) -> float:
         try:
-            value = float(f(at))
+            return evaluate_finite(f, at, name)
         except GeraldNAError as exc:
             raise failed(exc) from None
-        if not math.isfinite(value):
-            raise failed(InputError(f"{name} is not a finite number at X = {at!r}"))
-        return value
 
     # FO = F(X)
     fo = evaluate(x, "F(X)")
