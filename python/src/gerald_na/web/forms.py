@@ -13,12 +13,12 @@ accepted, as are ordinary Python spellings; ``nan``, ``inf`` and anything else a
 a message naming the field.
 """
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from gerald_na.registry import CatalogEntry, CatalogInput
+from gerald_na.registry.models import parse_data_card_token
 from gerald_na.web.services import MAX_LIST_ITEMS
 
 __all__ = [
@@ -35,8 +35,6 @@ __all__ = [
 CUSTOM_FUNCTION = "custom"
 """Value of the ``function`` select that means "use the custom expression"."""
 
-_INT = re.compile(r"^[+-]?\d+$")
-_REAL = re.compile(r"^[+-]?(\d+\.?\d*|\.\d+)([EeDd][+-]?\d+)?$")
 MAX_FIELD_LENGTH = 64
 
 
@@ -47,23 +45,32 @@ class FormLike(Protocol):
 
 
 def parse_number(text: str, *, integer: bool) -> int | float:
-    """Parse one typed number; raises :class:`ValueError` with a learner-friendly message."""
+    """Parse one typed number; raises :class:`ValueError` with a learner-friendly message.
+
+    The syntax is the data card's (:func:`~gerald_na.registry.models.parse_data_card_token`);
+    an int field also accepts an integral real such as ``20.``.
+    """
     value = text.strip()
     if not value:
         raise ValueError("a value is required")
     if len(value) > MAX_FIELD_LENGTH:
         raise ValueError("the value is too long")
-    if integer:
-        if _INT.match(value):
-            return int(value)
-        if _REAL.match(value):
-            number = float(value.replace("D", "E").replace("d", "e"))
+    try:
+        if not integer:
+            return parse_data_card_token(value, integer=False)
+        try:
+            return parse_data_card_token(value, integer=True)
+        except ValueError:
+            # Web-only leniency: an integral real such as "20." or "1.E1" fills an int field
+            # (the CLI keeps Fortran's strict integer syntax).
+            number = float(parse_data_card_token(value, integer=False))
             if number.is_integer() and abs(number) < 2**53:
                 return int(number)
-        raise ValueError(f"{value!r} is not an integer")
-    if not _REAL.match(value):
-        raise ValueError(f"{value!r} is not a number (examples: 0.5, 1.E-5)")
-    return float(value.replace("D", "E").replace("d", "e"))
+            raise
+    except ValueError:
+        if integer:
+            raise ValueError(f"{value!r} is not an integer") from None
+        raise ValueError(f"{value!r} is not a number (examples: 0.5, 1.E-5)") from None
 
 
 def format_number(value: float) -> str:

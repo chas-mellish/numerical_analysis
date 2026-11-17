@@ -6,6 +6,7 @@ import pytest
 from starlette.datastructures import ImmutableMultiDict
 
 from gerald_na.registry import Registry, StepColumn, get_registry
+from gerald_na.registry.models import parse_data_card_token
 from gerald_na.web.forms import (
     default_form_values,
     format_number,
@@ -52,6 +53,22 @@ def test_parse_number(text: str, integer: bool, expected: float) -> None:
 def test_parse_number_rejects(text: str, integer: bool) -> None:
     with pytest.raises(ValueError, match=r"required|not a number|not an integer|too long"):
         parse_number(text, integer=integer)
+
+
+@pytest.mark.parametrize(
+    "text", ["0.", ".5", "1.D-3", "-2.5e2", "+7", "1.", "nan", "inf", "1e", "1.2.3", "0x10", "--1"]
+)
+def test_parse_number_uses_the_data_card_real_syntax(text: str) -> None:
+    """The form accepts exactly the reals the CLI's data-card parser accepts."""
+    try:
+        expected: float | None = float(parse_data_card_token(text, integer=False))
+    except ValueError:
+        expected = None
+    if expected is None:
+        with pytest.raises(ValueError, match="not a number"):
+            parse_number(text, integer=False)
+    else:
+        assert parse_number(text, integer=False) == expected
 
 
 def test_format_number() -> None:
