@@ -228,8 +228,7 @@ def _abs_residual_figure(data: ChartInput) -> Figure:
     title = f"|{label}| per iteration" + (" (log scale)" if log else "")
     layout = _layout(title, "iteration", f"|{label}|", showlegend=False)
     if log:
-        layout["yaxis"]["type"] = "log"
-        layout["yaxis"]["exponentformat"] = "power"
+        _log_axis(layout["yaxis"])
     return _figure("abs_residual", title, [trace], layout)
 
 
@@ -622,8 +621,7 @@ def _delta_figure(
     title = f"{label} per iteration, by factor" + (" (log scale)" if log else "")
     layout = _layout(title, "iteration within factor", label)
     if log:
-        layout["yaxis"]["type"] = "log"
-        layout["yaxis"]["exponentformat"] = "power"
+        _log_axis(layout["yaxis"])
     return _figure("factors_delta", title, traces, layout)
 
 
