@@ -451,6 +451,16 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
    (Lagrange's `n` and its number of points), register an input generator in
    `CUSTOM_GENERATORS` of `python/tests/parity/test_parity.py`.
 
+### Program-specific notes
+
+* **ch03_p01 (Simpson), the X = 0 seed.** The listing starts its sum with the literal `1.0`, the
+  limit of SIN(X)/X at 0. The catalog expression `SIN(X)/X` divides by zero there on the Python
+  engine, while the Fortran preset `f_sinc` returns 1. Both algorithms therefore take the first
+  ordinate as an optional `f0` argument (default: evaluate `f(0)`). The adapter passes the
+  book's `1.0` only when the function normalizes to the book's integrand (preset 1, or a learner's
+  `SINF(X)/X`). Any other function supplies its own F(0); a learner function undefined at 0 is an
+  `EXPRESSION` error. The `ODD_PANELS` trace message writes the comma of the book message as `;`.
+
 ### Golden and parity tests
 
 * `python/tests/golden/test_golden.py` runs every catalog entry's data card on the Python engine,

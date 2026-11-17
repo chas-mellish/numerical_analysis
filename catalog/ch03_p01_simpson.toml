@@ -1,0 +1,296 @@
+# Chapter 3, Program 1: the sine integral Si(B) by Simpson's 1/3 rule.
+# Schema: docs/architecture.md, "Catalog schema". Transcribed from docs/chapter_03_program_01_listing.pdf
+# (book page 73); every value below was read from the scan, not from the OCR text.
+
+id = "ch03_p01"
+title = "Simpson's 1/3 rule, Si(B)"
+method = "Simpson's 1/3 rule"
+summary = """
+Simpson's 1/3 rule approximates an integral by fitting a parabola through each pair of panels.
+With N (even) panels of width DELX = B/N the integral from 0 to B is
+DELX/3 * (F0 + 4F1 + 2F2 + 4F3 + ... + 2F(N-2) + 4F(N-1) + FN). The book's program evaluates the
+sine integral Si(B), the integral of SIN(X)/X from 0 to B. It first rejects an odd N, then adds the
+first, second and last ordinates and lets a DO loop add the remaining ones in (weight 2, weight 4)
+pairs. The first ordinate, F(0), is written as the literal 1.0 because SIN(X)/X cannot be evaluated
+at X = 0 (its limit there is 1). With the data card 5.0 100 the book prints
+VALUE OF SINE INTEGRAL FROM X = 0 TO X =  5.00 IS 1.5499307 WITH 100 PANELS.
+"""
+book_ref_confirmed = true
+precision_notes = """
+The book printed 1.5499307. The true value is Si(5) = 1.5499312449..., and Simpson's truncation
+error with 100 panels is only about 5e-9, so the real64 engines print 1.5499312 (value
+1.5499312397703537). The book's 5e-7 deficit comes from the arithmetic of its machine, not
+from the method.
+
+A modern real32 build (make build-fortran-single, IEEE binary32 with round-to-nearest) prints
+1.5499314 (value 1.54993140697479248), not the book's digits. With the book's order of summation
+the real32 result is the same in every rounding experiment; summing in k order instead gives
+1.5499310. So the order of summation does change the real32 digits, and the code keeps the scan's
+order exactly. The book's digit is reproduced by arithmetic with a 27-bit binary mantissa and
+chopped (truncated) results: that gives 1.549930662, which prints 1.5499307. This is the
+single-precision format of the IBM 7090/7094 class of machines, whose FORTRAN II named its
+library functions SINF, EXPF and so on, as the listing does. IEEE binary32 has a 24-bit mantissa
+and rounds, so its error is smaller and has no systematic bias. For the same reason the golden
+tests compare the SINGLE build with the book value within 1e-6, not digit for digit.
+
+The abscissa X is accumulated (X = X + 2.*DELX), not recomputed as K*DELX. In real32 it drifts by
+up to about 1e-5 at the far end of the interval. The ordinate at B is evaluated at B itself.
+"""
+book_output = """
+VALUE OF SINE INTEGRAL FROM X = 0 TO X =  5.00 IS 1.5499307 WITH 100 PANELS
+"""
+
+[book_ref]
+chapter = 3
+program = 1
+page = 73
+
+# ------------------------------------------------------------------ inputs (data-card order)
+# READ 100, B, N   /   100 FORMAT (F10.0, I10)
+
+[[inputs]]
+name = "b"
+type = "real"
+label = "B"
+default = 5.0
+min = -100.0
+max = 100.0
+help = "Upper limit of integration; the integral runs from X = 0 to X = B."
+card = 1
+
+[[inputs]]
+name = "n"
+type = "int"
+label = "N"
+default = 100
+min = 1
+max = 2000
+help = "Number of panels. Must be even (an odd N prints the book's message); the listing asks for N greater than 2."
+card = 1
+
+[data_card]
+# B in columns 1-10 (F10.0) and N right-justified in columns 11-20 (I10); the card after it reads ZZZZ.
+text = "5.0           100"
+values = { b = 5.0, n = 100 }
+note = "Drivers read the card list-directed, so the printed card works unchanged."
+
+# ------------------------------------------------------------------ function presets (DD3)
+
+[function]
+takes_function = true
+variable = "x"
+default_preset = 1
+
+[[function.presets]]
+id = 1
+label = "Book: sin(x)/x (Si(B))"
+expr = "SIN(X)/X"
+fortran_preset = 1
+note = "The book's F(X) = SINF(X)/X. Its value at X = 0 is the limit 1, which the listing writes as the literal seed 1.0 of the sum; both engines use exactly 1 there."
+
+[[function.presets]]
+id = 2
+label = "exp(-x^2)"
+expr = "EXP(-X**2)"
+fortran_preset = 2
+note = "Integral from 0 to B is sqrt(pi)/2 * erf(B); 0.8820813908 for B = 2."
+
+[[function.presets]]
+id = 3
+label = "1/(1+x^2)"
+expr = "1/(1+X**2)"
+fortran_preset = 3
+note = "Integral from 0 to B is atan(B); pi/4 for B = 1."
+
+# ------------------------------------------------------------------ trace protocol (DD2)
+
+[trace]
+step_columns = [
+    { key = "k", label = "K", format = "I5" },
+    { key = "x", label = "X", format = "F12.7" },
+    { key = "fx", label = "F(X)", format = "F12.7" },
+    { key = "weight", label = "WEIGHT", format = "F4.1" },
+]
+records = []
+result_extras = [
+    { key = "delx", type = "real", description = "DELX = B/XN, the panel width." },
+    { key = "sum", type = "real", description = "SUM, the weighted sum of the ordinates before the DELX/3 factor (SININT = DELX/3.*SUM)." },
+]
+
+# ------------------------------------------------------------------ golden expectations (DD4)
+
+[[expected]]
+name = "value"
+kind = "real"
+field = "value"
+description = "VALUE OF SINE INTEGRAL FROM X = 0 TO X =  5.00 IS 1.5499307 WITH 100 PANELS"
+book_value = 1.5499307
+tol_real64 = 1.0e-6
+tol_real32 = 1.0e-6
+real64_value = 1.5499312397703537
+tol_real64_value = 1.0e-12
+
+[[expected]]
+name = "panels"
+kind = "int"
+field = "n"
+description = "WITH 100 PANELS"
+book_value = 100
+
+[[expected]]
+name = "ordinates"
+kind = "int"
+field = "iterations"
+description = "N + 1 = 101 ordinates enter the sum (not printed by the book)."
+book_value = 101
+
+# ------------------------------------------------------------------ files
+
+[files]
+legacy = ["legacy_code/fortran/chapter_3/sine_integral.f90"]
+scan_pdf = "docs/chapter_03_program_01_listing.pdf"
+fortran_module = "fortran/src/simpson_mod.f90"
+fortran_app = "fortran/app/ch03_p01_simpson.f90"
+fortran_executable = "ch03_p01_simpson"
+python_callable = "gerald_na.algorithms.simpson:simpson"
+study_page = "content/ch03_p01.md"
+
+[chart]
+kind = "integrand_panels"
+options = { x_key = "x", y_key = "fx", weight_key = "weight", lower = 0.0, upper_input = "b", panels_input = "n" }
+
+# ------------------------------------------------------------------ practice questions
+# Reference answers computed with the engines (real64).
+
+[[practice]]
+id = "book-value-real64"
+prompt = "Run the book's data card (5.0 100). What value of Si(5) does a modern real64 run print? Give 7 decimals."
+answer_field = "value"
+answer = 1.5499312397703537
+tolerance = 5.0e-8
+explanation = "1.5499312 agrees with the true Si(5) = 1.5499312449 to 8 figures. The book's 1.5499307 is low by 5e-7 because of the arithmetic of its 1970s machine, not because of the method."
+
+[[practice]]
+id = "ten-panels"
+prompt = "Keep B = 5.0 but use only N = 10 panels. What value does Simpson's rule give now?"
+inputs = { n = 10 }
+answer_field = "value"
+answer = 1.5498781486776514
+tolerance = 5.0e-8
+explanation = "1.5498781: with DELX = 0.5 the truncation error grows to 5.3e-5. Ten times more panels (the book's N = 100) cut it to 5.2e-9, a factor of about 10**4, as expected for a fourth-order rule."
+
+[[practice]]
+id = "ordinates"
+prompt = "With the book's card (N = 100), how many ordinates F(X) enter Simpson's sum?"
+answer_field = "iterations"
+answer = 101
+tolerance = 0.0
+explanation = "N panels have N + 1 ordinates, X = 0, DELX, ..., B. The first is the seed 1.0, the next and the last are added before the loop, and DO 10 I = 2,NHALF adds the other 98 in pairs."
+
+[[practice]]
+id = "panel-width"
+prompt = "With B = 5.0 and N = 100, what is the panel width DELX?"
+answer_field = "delx"
+answer = 0.05
+tolerance = 1.0e-12
+explanation = "DELX = B/XN = 5.0/100. = 0.05. The final multiplication is SININT = DELX/3.*SUM."
+
+[[practice]]
+id = "gauss-integral"
+prompt = "Choose preset 2 (exp(-x^2)) with B = 2.0 and N = 100. What integral is computed? Give 8 decimals."
+inputs = { b = 2.0 }
+preset = 2
+answer_field = "value"
+answer = 0.8820813901111865
+tolerance = 5.0e-9
+explanation = "The exact value is sqrt(pi)/2 * erf(2) = 0.88208139076. Simpson's rule with DELX = 0.02 gives 0.88208139011, within 7e-10 of it."
+
+[[practice]]
+id = "runge-pi"
+prompt = "Choose preset 3 (1/(1+x^2)) with B = 1.0 and N = 10. What integral is computed? Give 8 decimals."
+inputs = { b = 1.0, n = 10 }
+preset = 3
+answer_field = "value"
+answer = 0.7853981534848037
+tolerance = 5.0e-9
+explanation = "The integral of 1/(1+x^2) from 0 to 1 is atan(1) = pi/4. Ten panels give 0.78539815, 1e-8 below pi/4: four times the result is 3.1415926, pi to 7 digits."
+
+# ------------------------------------------------------------------ errata
+# Mirrored in the ERRATA header of fortran/app/ch03_p01_simpson.f90 and on content/ch03_p01.md.
+
+[[errata]]
+id = "ocr-arithmetic-if"
+kind = "ocr_slip"
+original = "IF (N = 2*NHALF) 99,1,99"
+corrected = "IF (N - 2*NHALF) 99,1,99"
+note = "An arithmetic IF branches on the sign of an expression; the scan has a minus sign. N - 2*(N/2) is 0 for even N and nonzero for odd N."
+
+[[errata]]
+id = "ocr-do-comma"
+kind = "ocr_slip"
+original = "DO 10 I = 2.NHALF"
+corrected = "DO 10 I = 2,NHALF"
+note = "The text transcription misread the comma as a period. The listing prints both with the same raised dot, and only a comma is valid syntax here."
+
+[[errata]]
+id = "ocr-sum"
+kind = "ocr_slip"
+original = "SININT = DELX/3.*5UM"
+corrected = "SININT = DELX/3.*SUM"
+note = "The letter S was misread as the digit 5. The expression is evaluated left to right: (DELX/3.)*SUM."
+
+[[errata]]
+id = "ocr-f10-7"
+kind = "ocr_slip"
+original = "FORMAT (... ,Fl0.7, ...)"
+corrected = "201 FORMAT (41H VALUE OF SINE INTEGRAL FROM X = 0 TO X = , F6.2, 3H IS , F10.7, 5H WITH , I4, 7H PANELS )"
+note = "The digit 1 was misread as the letter l. All Hollerith counts were checked: 41, 3, 5 and 7 characters, each with its leading blank."
+
+[[errata]]
+id = "seed-is-f0"
+kind = "rewrite_drift"
+original = "rewrite: f(0) = 1 inside f, then total = f(0) + 4*f(delx) + f(b)"
+corrected = "SUM = 1.0 + 4.*F(DELX) + F(B)  (the seed 1.0 is F(0) for SIN(X)/X)"
+note = "The scan seeds the sum with the literal 1.0, the limit of SIN(X)/X at X = 0. Both modules take this seed as an optional argument (f0). When it is not given they evaluate F(0), which is how the seed generalizes to other integrands. Preset 1 returns exactly 1 at 0 on both engines; the Python adapter passes the book's 1.0 because the expression SIN(X)/X divides by zero there."
+
+[[errata]]
+id = "prompt-and-blank-lines"
+kind = "rewrite_drift"
+original = "print 'Upper limit of integration B, and number of panels N (even, > 2)?'; '(/,A ...)' formats"
+corrected = "READ 100, B, N with no prompt; 200 and 201 FORMATs without a slash"
+note = "The rewrite printed a prompt and a blank line before each message. The book prints only the format 201 line, or message 200 for an odd N."
+
+[[errata]]
+id = "one-trip-do"
+kind = "original_quirk"
+original = "C READ UPPER LIMIT OF INTEGRATION AND NUMBER OF PANELS. N GREATER THAN 2"
+corrected = "N = 2 is accepted; DO 10 I = 2,NHALF runs zero times and the three-ordinate rule results"
+note = "FORTRAN II/IV executed a DO body at least once. With N = 2 (NHALF = 1) the original would have added F(2*DELX) and F(3*DELX), ordinates beyond B, which is why the comment asks for N greater than 2. Fortran 2018 loops are zero-trip, so N = 2 is correct here."
+
+[[errata]]
+id = "truncated-digits"
+kind = "original_quirk"
+original = "1970s line printer: digits chopped and no leading zero"
+corrected = "book text rendered with RZ (round toward zero) and without the leading zero"
+note = "This is the same convention as Chapter 1, Program 1. For the book card it gives 1.5499312 in real64 (round-to-nearest would also print 1.5499312), and an integral below 1 prints as, for example, .9460830."
+
+[[errata]]
+id = "odd-message-trace-comma"
+kind = "modernization"
+original = "200 FORMAT (60H WITH ODD NUMBER OF PANELS, SIMPSONS 1/3 RULE DOES NOT APPLY )"
+corrected = "ERROR,code=ODD_PANELS,message=WITH ODD NUMBER OF PANELS; SIMPSONS 1/3 RULE DOES NOT APPLY"
+note = "Trace messages contain no commas (DD2), so the ODD_PANELS record and OddPanelsError.message use a semicolon. The book text (stdout, book_output) keeps the comma."
+
+[[errata]]
+id = "n-below-two"
+kind = "modernization"
+original = "1 XN = N / DELX = B/XN  (N = 0 divides by zero; a negative even N integrates nonsense)"
+corrected = "N = 0, a negative even N and N > 1000000 are INPUT errors (InputError)"
+note = "The parity test runs first, as in the scan, so N = 1 or a negative odd N still prints the odd-panels message. The UI bounds N to 1..2000."
+
+[[errata]]
+id = "structured-control-flow"
+kind = "modernization"
+original = "arithmetic IF / CALL EXIT; statement function F(X) = SINF(X)/X; READ 100 with FORMAT (F10.0, I10)"
+corrected = "IF blocks and STOP with an exit status; F passed as a procedure argument (--preset N); list-directed READ"
+note = "The order and grouping of every sum are kept: (1.0 + 4.*F(DELX)) + F(B), then (SUM + 2.*F(X)) + 4.*F(X+DELX) with X accumulated, then (DELX/3.)*SUM. This keeps both engines bit-identical and fixes the real32 digits."

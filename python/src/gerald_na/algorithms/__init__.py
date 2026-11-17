@@ -14,6 +14,7 @@ from gerald_na.algorithms.bairstow import (
     factor_roots,
 )
 from gerald_na.algorithms.bisection import BisectionResult, BisectionStep, bisection
+from gerald_na.algorithms.simpson import SimpsonResult, SimpsonStep, simpson
 
 __all__ = [
     "BairstowFactor",
@@ -23,10 +24,13 @@ __all__ = [
     "BisectionStep",
     "Rounding",
     "bairstow",
+    "SimpsonResult",
+    "SimpsonStep",
     "bisection",
     "factor_roots",
     "format_e",
     "format_es",
     "format_f",
     "format_i",
+    "simpson",
 ]
