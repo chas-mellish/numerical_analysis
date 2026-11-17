@@ -53,11 +53,11 @@ halvings for the book data card ``0. 1. 1.E-5`` (root ``.4435729``). Only the la
 of a few F(X) values differs from the scan.
 """
 
-import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from gerald_na.algorithms._fortran_format import Rounding, format_f, format_i
+from gerald_na.algorithms._evaluation import evaluate_finite
+from gerald_na.algorithms._fortran_format import Rounding, format_f, format_i, render_records
 from gerald_na.errors import BracketError, InputError, NonConvergenceError, ZeroProductError
 
 __all__ = [
@@ -119,12 +119,6 @@ def _fmt_input_root(x: float, rounding: Rounding) -> str:
     )
 
 
-def _render(records: list[str], carriage_control: bool) -> str:
-    """Join records as printed: the line printer consumes the carriage-control column."""
-    lines = records if carriage_control else [record[1:] for record in records]
-    return "".join(line + "\n" for line in lines)
-
-
 @dataclass(frozen=True, slots=True)
 class BisectionStep:
     """One pass through the ``DO 30`` loop.
@@ -183,20 +177,13 @@ class BisectionResult:
         else:
             records = [_fmt_step(step.x, step.fx, rounding) for step in self.steps]
             records.append(_fmt_root(self.value, self.iterations, rounding))
-        return _render(records, carriage_control)
-
-
-def _evaluate(f: Callable[[float], float], x: float) -> float:
-    value = float(f(x))
-    if not math.isfinite(value):
-        raise InputError(f"F(X) is not a finite number at X = {x!r}")
-    return value
+        return render_records(records, carriage_control)
 
 
 def _steps_text(steps: list[BisectionStep], final: str) -> str:
     records = [_fmt_step(step.x, step.fx, _ROUNDING) for step in steps]
     records.append(" " + final)
-    return _render(records, carriage_control=False)
+    return render_records(records, carriage_control=False)
 
 
 def bisection(
@@ -231,8 +218,8 @@ def bisection(
     x1, x2, tol = float(x1), float(x2), float(tol)
     start_x1, start_x2 = x1, x2
 
-    fx1 = _evaluate(f, x1)
-    fx2 = _evaluate(f, x2)
+    fx1 = evaluate_finite(f, x1)
+    fx2 = evaluate_finite(f, x2)
     start_fx1, start_fx2 = fx1, fx2
 
     # IF (FX1*FX2) 1, 2, 3
@@ -261,12 +248,12 @@ def bisection(
     for i in range(1, max_iter + 1):
         x = (x1 + x2) / 2.0
         try:
-            fx = _evaluate(f, x)
+            fx = evaluate_finite(f, x)
         except InputError as exc:
             # Keep the error's class (a learner function raises ExpressionError) and attach the
             # rows completed so far, like the Fortran trace (STEP records before the ERROR).
             exc.steps = tuple(steps)
-            exc.book_output = _render(
+            exc.book_output = render_records(
                 [_fmt_step(step.x, step.fx, _ROUNDING) for step in steps], carriage_control=False
             )
             raise

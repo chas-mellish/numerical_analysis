@@ -64,7 +64,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal
 
-from gerald_na.algorithms._fortran_format import Rounding, format_f, format_i
+from gerald_na.algorithms._fortran_format import Rounding, format_f, format_i, render_records
 from gerald_na.errors import DegreeError, InputError, NonConvergenceError
 
 __all__ = [
@@ -240,12 +240,6 @@ def _fmt_factor(factor: BairstowFactor, rounding: Rounding) -> str:
     return f" {fixed[0]}X + {fixed[1]}"
 
 
-def _render(records: list[str], carriage_control: bool) -> str:
-    """Join records as printed: the line printer consumes the carriage-control column."""
-    lines = records if carriage_control else [record[1:] for record in records]
-    return "".join(line + "\n" for line in lines)
-
-
 def _book_records(
     coeffs: Sequence[float], n: int, factors: Sequence[BairstowFactor], rounding: Rounding
 ) -> list[str]:
@@ -311,7 +305,9 @@ class BairstowResult:
         writes it to stdout; ``rounding`` selects the rounding of the factor lines (default: the
         book's chopping, ``Rounding.ZERO``).
         """
-        return _render(_book_records(self.coeffs, self.n, self.factors, rounding), carriage_control)
+        return render_records(
+            _book_records(self.coeffs, self.n, self.factors, rounding), carriage_control
+        )
 
     def verbose_text(self, *, carriage_control: bool = False) -> str:
         """The driver's ``--verbose`` extras (real64 build): true factors and their roots."""
@@ -345,7 +341,7 @@ class BairstowResult:
             records += [f"   ROOT {_root_text(root)}" for root in roots]
         records.append(f" ZERO-DENOMINATOR NUDGES = {self.nudges}")
         records.append(f" TOTAL ITERATIONS = {self.iterations}")
-        return _render(records, carriage_control)
+        return render_records(records, carriage_control)
 
 
 def _check_int(name: str, value: object) -> int:
@@ -395,11 +391,13 @@ def bairstow(
 
     if not MIN_DEGREE <= n <= MAX_DEGREE:
         message = msg_degree_out_of_range(n)
-        raise DegreeError(message, book_output=_render([_MSG_1000, " " + message], False))
+        raise DegreeError(message, book_output=render_records([_MSG_1000, " " + message], False))
     for power in range(MAX_DEGREE, n, -1):
         if card[N_COEFFS - 1 - power] != 0.0:
             message = msg_high_coefficient(power, n)
-            raise DegreeError(message, book_output=_render([_MSG_1000, " " + message], False))
+            raise DegreeError(
+                message, book_output=render_records([_MSG_1000, " " + message], False)
+            )
 
     # 1-based arrays as in the listing: a[3..9] = A(3..9); index 0 unused.
     a = [0.0, 0.0, 0.0, *card]
@@ -415,7 +413,7 @@ def bairstow(
     def fail() -> NonConvergenceError:
         message = msg_non_convergent(lim)
         records = [*_book_records(card, n, factors, _FACTOR_ROUNDING), " " + message]
-        return NonConvergenceError(message, steps=steps, book_output=_render(records, False))
+        return NonConvergenceError(message, steps=steps, book_output=render_records(records, False))
 
     while True:
         kount = 1  # 11 KOUNT = 1

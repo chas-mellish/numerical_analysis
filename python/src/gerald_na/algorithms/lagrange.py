@@ -47,7 +47,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from gerald_na.algorithms._fortran_format import Rounding, format_f, format_i
+from gerald_na.algorithms._fortran_format import Rounding, format_f, format_i, render_records
 from gerald_na.errors import DegreeError, InputError
 
 __all__ = [
@@ -101,12 +101,6 @@ def _fmt_value(xin: float, yout: float, rounding: Rounding) -> str:
     )
 
 
-def _render(records: list[str], carriage_control: bool) -> str:
-    """Join records as printed: the line printer consumes the carriage-control column."""
-    lines = records if carriage_control else [record[1:] for record in records]
-    return "".join(line + "\n" for line in lines)
-
-
 @dataclass(frozen=True, slots=True)
 class LagrangeStep:
     """One pass through the ``DO 20`` loop.
@@ -148,7 +142,7 @@ class LagrangeResult:
         every record, as the Fortran driver writes it to stdout.
         """
         records = [_fmt_header(self.n), _fmt_value(self.xin, self.value, rounding)]
-        return _render(records, carriage_control)
+        return render_records(records, carriage_control)
 
 
 def _check_points(xs: tuple[float, ...], ys: tuple[float, ...], xin: float) -> None:

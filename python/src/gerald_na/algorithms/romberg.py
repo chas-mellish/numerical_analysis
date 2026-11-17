@@ -68,7 +68,14 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from gerald_na.algorithms._fortran_format import Rounding, format_es, format_f, format_i
+from gerald_na.algorithms._evaluation import evaluate_finite
+from gerald_na.algorithms._fortran_format import (
+    Rounding,
+    format_es,
+    format_f,
+    format_i,
+    render_records,
+)
 from gerald_na.errors import InputError
 
 __all__ = [
@@ -149,12 +156,6 @@ def _fmt_not_converged(value: float, tol: float, rounding: Rounding) -> list[str
     ]
 
 
-def _render(records: list[str], carriage_control: bool) -> str:
-    """Join records as printed: the line printer consumes the carriage-control column."""
-    lines = records if carriage_control else [record[1:] for record in records]
-    return "".join(line + "\n" for line in lines)
-
-
 @dataclass(frozen=True, slots=True)
 class RombergStep:
     """One halving (one pass through ``DO 20``) and its tolerance test.
@@ -218,14 +219,7 @@ class RombergResult:
             records.extend(_fmt_converged(self.value, self.subintervals, self.tol, rounding))
         else:
             records.extend(_fmt_not_converged(self.value, self.tol, rounding))
-        return _render(records, carriage_control)
-
-
-def _evaluate(f: Callable[[float], float], x: float) -> float:
-    value = float(f(x))
-    if not math.isfinite(value):
-        raise InputError(f"F(X) is not a finite number at X = {x!r}")
-    return value
+        return render_records(records, carriage_control)
 
 
 def romberg(
@@ -265,13 +259,13 @@ def romberg(
     try:
         # H = B/10. / SUM = 1. + FCN(B)  (generalized: F0 + F(B), F0 = F(0) by default)
         h = b / float(BOOK_FIRST_PANELS)
-        total = float(f0) if f0 is not None else _evaluate(f, 0.0)
-        total = total + _evaluate(f, b)
+        total = float(f0) if f0 is not None else evaluate_finite(f, 0.0)
+        total = total + evaluate_finite(f, b)
         # DO 10 I = 2,10: the 9 interior ordinates, X advancing by H
         x = 0.0
         for _ in range(2, BOOK_FIRST_PANELS + 1):
             x = x + h
-            total = total + _evaluate(f, x) * 2.0
+            total = total + evaluate_finite(f, x) * 2.0
         # columns[c] is TRAP(1..c+1, c+1), i.e. printed line c+1
         columns: list[list[float]] = [[(h / 2.0) * total]]
 
@@ -281,7 +275,7 @@ def romberg(
             k = BOOK_FIRST_PANELS * 2**i
             # DO 30 J = 2,K,2: SUM = SUM + FCN(X)*2. / X = X + H + H
             for _ in range(2, k + 1, 2):
-                total = total + _evaluate(f, x) * 2.0
+                total = total + evaluate_finite(f, x) * 2.0
                 x = (x + h) + h
             previous = columns[i - 1]
             column = [(h / 2.0) * total]

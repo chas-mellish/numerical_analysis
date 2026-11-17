@@ -52,7 +52,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from gerald_na.algorithms._fortran_format import Rounding, format_f, format_i
+from gerald_na.algorithms._fortran_format import Rounding, format_f, format_i, render_records
 from gerald_na.errors import GeraldNAError, InputError, OddPanelsError
 
 __all__ = [
@@ -90,12 +90,6 @@ def _fmt_value(b: float, value: float, n: int, rounding: Rounding) -> str:
     )
 
 
-def _render(records: list[str], carriage_control: bool) -> str:
-    """Join records as printed: the line printer consumes the carriage-control column."""
-    lines = records if carriage_control else [record[1:] for record in records]
-    return "".join(line + "\n" for line in lines)
-
-
 @dataclass(frozen=True, slots=True)
 class SimpsonStep:
     """One ordinate of Simpson's sum: index ``k`` (0..N), abscissa ``x``, ``fx`` = F(X) and its
@@ -131,7 +125,7 @@ class SimpsonResult:
         ``carriage_control=True`` keeps the leading blank of the record, as a modern Fortran
         processor writes it to stdout; ``rounding`` selects another output rounding mode.
         """
-        return _render([_fmt_value(self.b, self.value, self.n, rounding)], carriage_control)
+        return render_records([_fmt_value(self.b, self.value, self.n, rounding)], carriage_control)
 
 
 def _sorted_steps(rows: dict[int, SimpsonStep]) -> tuple[SimpsonStep, ...]:

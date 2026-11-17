@@ -31,7 +31,7 @@ from decimal import (
 )
 from enum import StrEnum
 
-__all__ = ["Rounding", "format_e", "format_es", "format_f", "format_i"]
+__all__ = ["Rounding", "format_e", "format_es", "format_f", "format_i", "render_records"]
 
 
 class Rounding(StrEnum):
@@ -263,3 +263,13 @@ def format_es(
         return _stars(w)
     digits = f"{significand:.{d}f}" if d else f"{significand:.0f}."
     return _fit(f"{_sign(negative, sign_plus)}{digits}{exponent_text}", w)
+
+
+def render_records(records: list[str], carriage_control: bool) -> str:
+    """Join output records into text, one per line.
+
+    Each record starts with the Fortran carriage-control column; ``carriage_control=False``
+    drops it, as ``book_text()`` does by default.
+    """
+    lines = records if carriage_control else [record[1:] for record in records]
+    return "".join(line + "\n" for line in lines)
