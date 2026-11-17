@@ -325,6 +325,7 @@ def test_point_list_errors_mark_the_rows(
     assert "aria-invalid" not in form_control(response.text, "input-xin")
 
 
+@pytest.mark.fortran
 def test_compare_traces_stack_when_narrow(client: TestClient) -> None:
     """The compare columns get a 36rem minimum (stacked at 1280px) and scroll containers."""
     css = client.get("/static/app.css").text
