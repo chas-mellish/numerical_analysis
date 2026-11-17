@@ -1,0 +1,178 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GCC_MAJOR: "16"
+  LLVM_MAJOR: "22"
+  FPM_VERSION: "0.13.0"
+  UV_VERSION: "0.13.8"
+  PYTHON_VERSION: "3.15"
+
+jobs:
+  fortran-gfortran:
+    name: Fortran (gfortran 16) build + fpm test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install gfortran ${{ env.GCC_MAJOR }} (ubuntu-toolchain-r/test PPA)
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends "gcc-${GCC_MAJOR}" "gfortran-${GCC_MAJOR}"
+          sudo update-alternatives --install /usr/bin/gfortran gfortran "/usr/bin/gfortran-${GCC_MAJOR}" 100
+          sudo update-alternatives --install /usr/bin/gcc gcc "/usr/bin/gcc-${GCC_MAJOR}" 100
+          gfortran --version
+      - &install-fpm
+        name: Install fpm ${{ env.FPM_VERSION }}
+        run: |
+          base="https://github.com/fortran-lang/fpm/releases/download/v${FPM_VERSION}/fpm-${FPM_VERSION}-linux-x86_64-gcc-12"
+          curl -fsSL -o fpm "$base"
+          curl -fsSL -o fpm.sha256 "$base.sha256"
+          echo "$(cut -d ' ' -f 1 fpm.sha256)  fpm" | sha256sum -c -
+          sudo install -m 0755 fpm /usr/local/bin/fpm
+          rm fpm fpm.sha256
+          fpm --version
+      - name: Build (strict flags, warnings are errors) and install into build/bin
+        run: make build-fortran
+      - name: fpm test (debug profile, -fcheck=all)
+        run: make test-fortran
+      - name: Build SINGLE precision into build/single/bin
+        run: make build-fortran-single
+      - name: Upload Fortran drivers
+        uses: actions/upload-artifact@v7
+        with:
+          name: fortran-bin
+          path: build/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  fortran-flang:
+    name: Fortran (LLVM flang) build + fpm test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install LLVM flang ${{ env.LLVM_MAJOR }} (apt.llvm.org)
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/apt.llvm.org.gpg
+          echo "deb [signed-by=/usr/share/keyrings/apt.llvm.org.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-${LLVM_MAJOR} main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends "flang-${LLVM_MAJOR}"
+          sudo update-alternatives --install /usr/bin/flang flang "/usr/bin/flang-${LLVM_MAJOR}" 100
+          flang --version
+      - *install-fpm
+      - name: Build with flang (strict, warnings are errors)
+        run: make build-fortran-flang
+      - name: fpm test with flang
+        run: make test-fortran-flang
+
+  python-lint:
+    name: Python lint (ruff check + format check)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - &setup-uv
+        uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: python/uv.lock
+      - name: uv sync
+        run: uv --directory python sync --frozen
+      - name: ruff check
+        run: uv --directory python run ruff check --output-format=github
+      - name: ruff format --check
+        run: uv --directory python run ruff format --check
+
+  python-types:
+    name: mypy --strict
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - *setup-uv
+      - run: uv --directory python sync --frozen
+      - name: mypy --strict
+        run: uv --directory python run mypy --strict src tests
+
+  python-test:
+    name: pytest + coverage (algorithms, expr >= 90%)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - *setup-uv
+      - run: uv --directory python sync --frozen
+      - name: pytest (Fortran-dependent tests skip without binaries; e2e excluded)
+        run: make test
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-xml
+          path: python/coverage.xml
+          if-no-files-found: ignore
+
+  parity:
+    name: Golden (real64 + SINGLE) and cross-engine parity
+    needs: fortran-gfortran
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - &install-gfortran-runtime
+        name: Install the gfortran ${{ env.GCC_MAJOR }} runtime for the downloaded drivers
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends "libgfortran5"
+      - &download-bin
+        name: Download Fortran drivers
+        uses: actions/download-artifact@v8
+        with:
+          name: fortran-bin
+          path: build/
+      - &restore-exec-bits
+        name: Restore executable bits (artifacts drop file modes)
+        run: find build -path '*/bin/*' -type f -exec chmod +x {} +
+      - *setup-uv
+      - run: uv --directory python sync --frozen
+      - name: Check the downloaded drivers (Fortran cases must not skip)
+        run: |
+          test -n "$(ls -A build/bin)"
+          test -n "$(ls -A build/single/bin)"
+      - name: Golden (book fidelity, real64 + SINGLE) and parity tests
+        run: uv --directory python run pytest -rs tests/golden tests/parity
+
+  e2e:
+    name: Playwright e2e
+    needs: fortran-gfortran
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - *install-gfortran-runtime
+      - *download-bin
+      - *restore-exec-bits
+      - *setup-uv
+      - run: uv --directory python sync --frozen
+      - name: Playwright e2e (installs Chromium with system dependencies)
+        run: make e2e PLAYWRIGHT_INSTALL_FLAGS=--with-deps
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-artifacts
+          path: |
+            python/test-results/
+            python/playwright-report/
+          if-no-files-found: ignore

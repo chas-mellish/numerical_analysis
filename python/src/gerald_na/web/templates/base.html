@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Gerald, Applied Numerical Analysis{% endblock %}</title>
+  <meta name="htmx-config" content='{"allowEval": false, "includeIndicatorStyles": false, "selfRequestsOnly": true, "responseHandling": [{"code": "204", "swap": false}, {"code": "[23]..", "swap": true}, {"code": "422", "swap": true, "error": false}, {"code": "503", "swap": true, "error": false}, {"code": "[45]..", "swap": false, "error": true}, {"code": "...", "swap": false}]}'>
+  <link rel="stylesheet" href="/static/app.css?v={{ app_version }}">
+  <script src="/static/vendor/htmx.min.js?v=2.0.11" defer></script>
+  {% block head %}{% endblock %}
+  <script src="/static/app.js?v={{ app_version }}" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main" data-testid="skip-link">Skip to content</a>
+  <header class="site-header">
+    <a href="/" class="brand" data-testid="nav-brand">Gerald &middot; <em>Applied Numerical Analysis</em></a>
+    <span class="tagline">Book FORTRAN programs, modern Fortran and Python, side by side</span>
+  </header>
+  <main id="main" class="page">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site-footer">
+    <p>gerald-na {{ app_version }} &middot; <a href="/api/programs" data-testid="nav-api">JSON API</a> &middot; <a href="/docs" data-testid="nav-api-docs">API docs</a></p>
+  </footer>
+</body>
+</html>

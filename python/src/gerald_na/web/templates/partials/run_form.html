@@ -1,0 +1,116 @@
+{# Run form generated from the catalog inputs; values = FormValues, engines = EngineStatus map. #}
+{% set custom = values.function == custom_function %}
+{# field_errors: input name -> message of a rejected run (full-page POST without JS); the HTMX
+   path marks the same fields in app.js after the results swap. #}
+{% set field_errors = field_errors | default({}) or {} %}
+{% macro invalid_attrs(name) %}{% if name in field_errors %} aria-invalid="true"{% endif %}{% endmacro %}
+{% macro described_by(name, base) %}{{ base }}{% if name in field_errors %}{{ " " if base else "" }}field-error-{{ name }}{% endif %}{% endmacro %}
+<form id="run-form" class="run-form" data-testid="run-form" method="post"
+      action="/programs/{{ entry.id }}/run"
+      hx-post="/programs/{{ entry.id }}/run" hx-target="#results" hx-swap="innerHTML"
+      hx-indicator="#run-indicator" novalidate>
+  <fieldset class="group">
+    <legend>Data card</legend>
+    {% for item in entry.inputs %}
+      {% set bounds %}{% if item.min is not none %}min {{ item.min | number }}{% endif %}{% if item.min is not none and item.max is not none %}, {% endif %}{% if item.max is not none %}max {{ item.max | number }}{% endif %}{% endset %}
+      {% if item.type in ("real", "int") %}
+      <div class="field">
+        <label for="in-{{ item.name }}">{{ item.label }} <span class="type">{{ item.type }}</span></label>
+        <input id="in-{{ item.name }}" name="in_{{ item.name }}" type="text"
+               inputmode="{{ 'numeric' if item.type == 'int' else 'decimal' }}"
+               value="{{ values.scalars.get(item.name, '') }}" autocomplete="off" spellcheck="false"
+               maxlength="64" aria-describedby="{{ described_by(item.name, 'help-' ~ item.name) }}"{{ invalid_attrs(item.name) }}
+               {% if item.name in field_errors %}class="invalid"{% endif %}
+               {% if item.name in count_inputs %}data-count-of="{{ count_inputs[item.name] }}"{% endif %}
+               data-testid="input-{{ item.name }}">
+        <p class="help" id="help-{{ item.name }}" data-testid="field-help-{{ item.name }}">{{ item.help }}{% if bounds | trim %} <span class="bounds" data-testid="field-bounds-{{ item.name }}">({{ bounds | trim }})</span>{% endif %}{% if item.name in count_inputs %} <span class="sync-note" data-testid="field-sync-note-{{ item.name }}">Updated automatically when you add or remove a row of {{ entry.input(count_inputs[item.name]).label }}.</span>{% endif %}</p>
+      </div>
+      {% else %}
+      {% set is_points = item.type == "point_list" %}
+      <fieldset class="list-input{% if item.name in field_errors %} invalid{% endif %}" data-testid="input-{{ item.name }}" data-list-name="{{ item.name }}"
+                data-list-kind="{{ item.type }}" data-list-label="{{ item.label }}"
+                data-fixed-length="{{ item.length if item.length else '' }}" aria-describedby="{{ described_by(item.name, 'help-' ~ item.name) }}">
+        <legend>{{ item.label }} <span class="type">{{ "list of (x, y) points" if is_points else "list of reals" }}{% if item.length %}, {{ item.length }} entries{% endif %}</span></legend>
+        <p class="help" id="help-{{ item.name }}" data-testid="field-help-{{ item.name }}">{{ item.help }}{% if bounds | trim %} <span class="bounds" data-testid="field-bounds-{{ item.name }}">({{ bounds | trim }})</span>{% endif %}</p>
+        <ol class="rows" data-rows>
+        {% if is_points %}
+          {% for x, y in values.points.get(item.name, []) %}
+          <li class="row" data-row>
+            <label for="in-{{ item.name }}-{{ loop.index0 }}-x">x<sub>{{ loop.index }}</sub></label>
+            <input id="in-{{ item.name }}-{{ loop.index0 }}-x" name="in_{{ item.name }}.x" type="text" inputmode="decimal" value="{{ x }}" autocomplete="off" maxlength="64"{% if item.name in field_errors %} class="invalid" aria-describedby="field-error-{{ item.name }}"{% endif %}{{ invalid_attrs(item.name) }} data-testid="input-{{ item.name }}-{{ loop.index0 }}-x">
+            <label for="in-{{ item.name }}-{{ loop.index0 }}-y">y<sub>{{ loop.index }}</sub></label>
+            <input id="in-{{ item.name }}-{{ loop.index0 }}-y" name="in_{{ item.name }}.y" type="text" inputmode="decimal" value="{{ y }}" autocomplete="off" maxlength="64"{% if item.name in field_errors %} class="invalid" aria-describedby="field-error-{{ item.name }}"{% endif %}{{ invalid_attrs(item.name) }} data-testid="input-{{ item.name }}-{{ loop.index0 }}-y">
+            {% if not item.length %}<button type="button" class="icon" data-remove-row aria-label="Remove point {{ loop.index }}" data-testid="remove-row-{{ item.name }}-{{ loop.index0 }}">Remove</button>{% endif %}
+          </li>
+          {% endfor %}
+        {% else %}
+          {% for v in values.lists.get(item.name, []) %}
+          <li class="row" data-row>
+            <label for="in-{{ item.name }}-{{ loop.index0 }}">{{ item.label }}<sub>{{ loop.index }}</sub></label>
+            <input id="in-{{ item.name }}-{{ loop.index0 }}" name="in_{{ item.name }}" type="text" inputmode="decimal" value="{{ v }}" autocomplete="off" maxlength="64"{% if item.name in field_errors %} class="invalid" aria-describedby="field-error-{{ item.name }}"{% endif %}{{ invalid_attrs(item.name) }} data-testid="input-{{ item.name }}-{{ loop.index0 }}">
+            {% if not item.length %}<button type="button" class="icon" data-remove-row aria-label="Remove entry {{ loop.index }}" data-testid="remove-row-{{ item.name }}-{{ loop.index0 }}">Remove</button>{% endif %}
+          </li>
+          {% endfor %}
+        {% endif %}
+        </ol>
+        {% if not item.length %}<button type="button" class="secondary small" data-add-row data-testid="add-row-{{ item.name }}">Add {{ "point" if is_points else "entry" }}</button>{% endif %}
+      </fieldset>
+      {% endif %}
+    {% endfor %}
+    <details class="data-card">
+      <summary data-testid="data-card-toggle">Book data card</summary>
+      <pre data-testid="data-card">{{ entry.data_card.text }}</pre>
+      {% if entry.data_card.note %}<p class="help">{{ entry.data_card.note }}</p>{% endif %}
+    </details>
+  </fieldset>
+
+  {% if entry.function.takes_function %}
+  <fieldset class="group function" data-function>
+    <legend>Function F({{ entry.function.variable | upper }})</legend>
+    <div class="field">
+      <label for="function-select">Function</label>
+      <select id="function-select" name="function" data-testid="preset-select" data-function-select{{ invalid_attrs("function") }}{% if "function" in field_errors %} class="invalid" aria-describedby="field-error-function"{% endif %}>
+        {% for preset in entry.function.presets %}
+        <option value="{{ preset.id }}" data-expr="{{ preset.expr }}" {% if values.function == preset.id | string %}selected{% endif %}>{{ preset.id }}: {{ preset.label }}</option>
+        {% endfor %}
+        <option value="{{ custom_function }}" {% if custom %}selected{% endif %}>Custom expression (Python engine only)</option>
+      </select>
+      <p class="help" data-testid="preset-expr" data-preset-expr {% if custom %}hidden{% endif %}>Preset F(x) = <code>{% for preset in entry.function.presets %}{% if values.function == preset.id | string %}{{ preset.expr }}{% endif %}{% endfor %}</code></p>
+    </div>
+    <div class="field">
+      <label for="custom-expr">Custom expression</label>
+      <input id="custom-expr" name="expression" type="text" value="{{ values.expression }}"
+             placeholder="for example x**3 - 2*x - 5" maxlength="500" autocomplete="off" spellcheck="false"
+             aria-describedby="{{ described_by('expression', 'custom-expr-help') }}"{{ invalid_attrs("expression") }}
+             {% if "expression" in field_errors %}class="invalid"{% endif %} data-testid="custom-expr" data-custom-expr>
+      <p class="help" id="custom-expr-help">Typing here selects the custom function. Use x, numbers, + - * / **, the constants {{ expr_constants }} and {{ expr_functions }}; the book's EXPF, SINF, ABSF... are accepted.</p>
+    </div>
+  </fieldset>
+  {% endif %}
+
+  <fieldset class="group engines" data-testid="engine-selector">
+    <legend>Engine</legend>
+    {% for name, label in [("python", "Python"), ("fortran", "Fortran (compiled book driver)"), ("compare", "Compare Python and Fortran")] %}
+      {% set status = engines[name] %}
+      {% set blocked = (not status.available) or (custom and name != "python") %}
+      <div class="engine-option">
+        <input type="radio" id="engine-{{ name }}" name="engine" value="{{ name }}"
+               {% if values.engine == name and not blocked %}checked{% endif %}
+               {% if blocked %}disabled{% endif %}
+               {% if not status.available %}data-unavailable="true"{% endif %}
+               {% if name != "python" %}data-needs-preset="true"{% endif %}
+               data-testid="engine-{{ name }}">
+        <label for="engine-{{ name }}">{{ label }}</label>
+        {% if not status.available %}<p class="engine-note" data-testid="engine-note-{{ name }}">Unavailable: {{ status.reason }}</p>{% endif %}
+      </div>
+    {% endfor %}
+    <p class="engine-note" data-testid="engine-custom-note" data-custom-note {% if not custom %}hidden{% endif %}>A custom expression runs on the Python engine only: the Fortran drivers evaluate the catalog presets (--preset N), so Fortran and compare are disabled.</p>
+  </fieldset>
+
+  <div class="actions">
+    <button type="submit" class="primary" data-testid="run-button" {% if not engines["python"].available and not engines["fortran"].available %}disabled{% endif %}>Run</button>
+    <button type="button" class="secondary" data-testid="reset-button"
+            hx-get="/programs/{{ entry.id }}/form" hx-target="#run-form" hx-swap="outerHTML">Reset to book data card</button>
+    <span id="run-indicator" class="htmx-indicator" data-testid="run-indicator" role="status">Running...</span>
+  </div>
+</form>

@@ -1,0 +1,116 @@
+# Test fixture: a confirmed program that takes a function (not a real book program).
+id = "ch09_p02"
+title = "Sample halving"
+method = "Bisection"
+summary = "Fixture entry used by the registry unit tests."
+book_ref_confirmed = true
+precision_notes = "None."
+book_output = "THE VALUE, X =   .5000000 IS A ROOT.   1 ITERATIONS WERE REQUIRED."
+
+[book_ref]
+chapter = 9
+program = 2
+page = 300
+title = "Fixtures"
+
+[[inputs]]
+name = "x1"
+type = "real"
+label = "X1"
+default = 0.0
+min = -10.0
+max = 10.0
+help = "Left end."
+card = 1
+
+[[inputs]]
+name = "x2"
+type = "real"
+label = "X2"
+default = 1.0
+min = -10.0
+max = 10.0
+help = "Right end."
+card = 1
+
+[[inputs]]
+name = "n"
+type = "int"
+label = "N"
+default = 20
+min = 1
+max = 50
+help = "Count."
+card = 2
+
+[data_card]
+text = """
+0.        1.
+20
+"""
+values = { x1 = 0.0, x2 = 1.0, n = 20 }
+
+[function]
+takes_function = true
+default_preset = 1
+
+[[function.presets]]
+id = 1
+label = "x - 1/2"
+expr = "x - 0.5"
+fortran_preset = 1
+
+[trace]
+step_columns = [
+    { key = "k", label = "I", format = "I3" },
+    { key = "x", label = "X", format = "F10.7" },
+]
+result_extras = [{ key = "root_at_endpoint", type = "bool", description = "Endpoint root." }]
+
+[[expected]]
+name = "root"
+kind = "real"
+field = "value"
+book_value = 0.5
+tol_real64 = 1.0e-7
+tol_real32 = 1.0e-6
+
+[[expected]]
+name = "iterations"
+kind = "int"
+book_value = 1
+
+[[expected]]
+name = "steps"
+kind = "rows"
+columns = ["k", "x"]
+tol_real64 = { x = 1.0e-7 }
+tol_real32 = { x = 1.0e-6 }
+book_value = [[1, 0.5]]
+
+[files]
+legacy = ["legacy_code/sample.f90"]
+scan_pdf = "docs/sample.pdf"
+fortran_module = "fortran/src/sample_mod.f90"
+fortran_app = "fortran/app/ch09_p02_sample.f90"
+fortran_executable = "ch09_p02_sample"
+python_callable = "gerald_na.cli:main"
+study_page = "content/ch09_p02.md"
+
+[chart]
+kind = "bracket"
+
+[[practice]]
+id = "wide"
+prompt = "Widen the interval."
+inputs = { x2 = 2.0 }
+answer_field = "iterations"
+answer = 2
+explanation = "Fixture."
+
+[[errata]]
+id = "fixture"
+kind = "ocr_slip"
+original = "A"
+corrected = "B"
+note = "Fixture."

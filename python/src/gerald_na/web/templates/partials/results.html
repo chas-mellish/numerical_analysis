@@ -1,0 +1,64 @@
+{% import "partials/outcome.html" as o %}
+{% set r = results %}
+<div class="results-body" data-testid="results-body" data-kind="{{ r.kind }}" data-mode="{{ r.mode }}">
+{% if r.kind == "invalid" %}
+  <div class="alert error" role="alert" data-testid="validation-error" data-code="{{ r.code }}">
+    <p><strong>{{ r.code }}</strong> {{ r.message }}</p>
+    {% if r.fields %}
+    <ul class="field-errors">
+      {% for name, message in r.fields.items() %}
+      <li id="field-error-{{ name }}" data-field-error="{{ name }}" data-testid="field-error-{{ name }}"><strong>{{ entry.input(name).label if name in entry.input_names else name }}</strong>: {{ message }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if r.position %}
+    <p>Problem at column <span data-testid="expr-error-column">{{ r.position }}</span>:</p>
+    <pre class="caret" data-testid="expr-error-position">{{ r.source }}
+{{ " " * (r.position - 1) }}^</pre>
+    {% endif %}
+  </div>
+{% elif r.kind == "unavailable" %}
+  <div class="alert error" role="alert" data-testid="engine-unavailable" data-code="{{ r.code }}">
+    <p><strong>{{ r.code }}</strong> {{ r.message }}</p>
+  </div>
+{% elif r.kind == "single" %}
+  {% set v = r.view %}
+  {{ o.summary(v) }}
+  {{ o.charts(v) }}
+  {{ o.steps_table(v) }}
+  {{ o.extras(v) }}
+  {{ o.book_text(v) }}
+{% elif r.kind == "compare" %}
+  {% set c = r.view %}
+  <section class="compare" data-testid="compare-view">
+    <div class="compare-summary {{ 'agree' if c.matches else 'differ' }}" data-testid="compare-summary" data-matches="{{ 'true' if c.matches else 'false' }}">
+      <h3 data-testid="compare-verdict">{% if c.matches %}The engines agree bit for bit{% else %}The engines differ{% endif %}</h3>
+      <ul>
+        <li data-testid="compare-iterations" data-same="{{ 'true' if c.same_iterations else 'false' }}">Iterations: {{ c.left.engine }} {{ c.iterations[0] }}, {{ c.right.engine }} {{ c.iterations[1] }}{% if not c.same_iterations %} <strong>(iteration counts differ)</strong>{% endif %}</li>
+        <li data-testid="compare-status">Outcome: {{ c.left.engine }} {{ c.left.status }}, {{ c.right.engine }} {{ c.right.status }}{% if not c.same_status %} <strong>(different outcomes)</strong>{% endif %}</li>
+        <li data-testid="compare-max-diff">Largest cell difference: abs {{ c.max_abs_diff | sci }}, rel {{ c.max_rel_diff | sci }} ({{ c.differing_cells }} differing cells{% if c.first_differing_row is not none %}, first in row {{ c.first_differing_row + 1 }}{% endif %})</li>
+        <li data-testid="compare-value-diff">Final value difference: abs {{ c.value_abs_diff | sci }}, rel {{ c.value_rel_diff | sci }}</li>
+        {% for note in c.notes %}<li data-testid="compare-note">{{ note }}</li>{% endfor %}
+      </ul>
+      <details>
+        <summary data-testid="per-column-toggle">Per column</summary>
+        <table class="records" data-testid="compare-columns">
+          <thead><tr><th scope="col">Column</th><th scope="col">max abs diff</th><th scope="col">max rel diff</th><th scope="col">differing rows</th></tr></thead>
+          <tbody>{% for col in c.columns %}<tr><th scope="row">{{ col.label }}</th><td>{{ col.max_abs_diff | sci }}</td><td>{{ col.max_rel_diff | sci }}</td><td>{{ col.differing_rows }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </details>
+    </div>
+    {{ o.charts(c.left) }}
+    <div class="compare-grid">
+      {% for v in (c.left, c.right) %}
+      <div class="compare-side" data-testid="compare-{{ v.engine }}">
+        <h3>{{ v.engine | capitalize }}</h3>
+        {{ o.summary(v) }}
+        {{ o.steps_table(v) }}
+        {{ o.book_text(v, "book-text-" ~ v.engine) }}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+</div>

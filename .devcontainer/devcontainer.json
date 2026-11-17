@@ -1,0 +1,35 @@
+{
+  "name": "gerald-na (gfortran 16, flang 22, fpm, uv, Python 3.15)",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "remoteUser": "ubuntu",
+  "forwardPorts": [
+    8000
+  ],
+  "portsAttributes": {
+    "8000": {
+      "label": "gerald-na web",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "make sync build-fortran",
+  "overrideCommand": true,
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "fortran-lang.linter-gfortran",
+        "charliermarsh.ruff",
+        "ms-python.python",
+        "ms-python.mypy-type-checker",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/python/.venv/bin/python"
+      }
+    }
+  }
+}
