@@ -19,18 +19,26 @@ import requests
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BIN_DIR = REPO_ROOT / "build" / "bin"
+SINGLE_BIN_DIR = REPO_ROOT / "build" / "single" / "bin"
 HOST = os.environ.get("GERALD_NA_HOST", "127.0.0.1")
 PORT = os.environ.get("GERALD_NA_PORT", "8000")
 BASE_URL = f"http://{HOST}:{PORT}"
 EVIDENCE_FILE = Path(os.environ.get("FT_EVIDENCE_FILE", "/tmp/ft_evidence.json"))
 
+# Book data cards shared by the real64 and real32 driver tests.
+BISECTION_CARD = "0. 1. 1.E-5\n"
+BAIRSTOW_CARD = "0. 1. -17.8 99.41 -261.218 352.611 -134.106\n0. 0. 1.E-5 20 5\n"
+SIMPSON_CARD = "5.0 100\n"
+ROMBERG_CARD = "15.0 2.E-7\n"
+LAGRANGE_CARD = "05\n2.3756 1.6\n3.2682 1.9\n4.4571 2.2\n6.0502 2.5\n8.1919 2.8\n5.0\n"
+
 _EVIDENCE: dict[str, dict[str, object]] = {}
 
 
-def run_driver(name, card, *flags, timeout=20):
-    """Run a compiled Fortran driver with ``card`` on stdin."""
+def run_driver(name, card, *flags, timeout=20, bin_dir=BIN_DIR):
+    """Run a compiled Fortran driver from ``bin_dir`` with ``card`` on stdin."""
     return subprocess.run(
-        [str(BIN_DIR / name), *flags],
+        [str(bin_dir / name), *flags],
         input=card,
         capture_output=True,
         text=True,
