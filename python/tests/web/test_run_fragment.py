@@ -115,6 +115,28 @@ def test_custom_expression_on_python(client: TestClient) -> None:
 
 
 @pytest.mark.parametrize("engine", ["fortran", "compare"])
+def test_engine_check_precedes_field_checks(client: TestClient, engine: str) -> None:
+    """HTML reports the same first code as the JSON API (shared build_request order)."""
+    form = book_form(engine, function="custom", expression="x - 0.5", in_tol="abc")
+    status, html = run(client, form)
+    assert status == 422
+    assert "CUSTOM_FUNCTION_ENGINE" in html
+    api = client.post(
+        f"/api/programs/{BISECTION}/run",
+        json={"engine": engine, "expression": "x - 0.5", "inputs": {"x1": 1.0e9}},
+    )
+    assert api.status_code == 422
+    assert api.json()["error"]["code"] == "CUSTOM_FUNCTION_ENGINE"
+
+
+def test_field_errors_still_reported(client: TestClient) -> None:
+    status, html = run(client, book_form("python", in_tol="abc", in_x1="1.E9"))
+    assert status == 422
+    assert 'data-testid="field-error-tol"' in html
+    assert 'data-testid="field-error-x1"' in html
+
+
+@pytest.mark.parametrize("engine", ["fortran", "compare"])
 def test_custom_expression_rejected_on_fortran(client: TestClient, engine: str) -> None:
     status, html = run(client, book_form(engine, function="custom", expression="x - 0.5"))
     assert status == 422

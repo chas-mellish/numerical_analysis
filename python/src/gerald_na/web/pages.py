@@ -32,7 +32,6 @@ from gerald_na.web.services import (
     FieldErrors,
     ProgramNotFound,
     WebState,
-    field_problems,
 )
 from gerald_na.web.templating import get_state, templates
 
@@ -170,31 +169,26 @@ async def program_run(request: Request, program_id: str) -> HTMLResponse:
     entry = _entry(state, program_id)
     form = await request.form()
     parsed = parse_run_form(entry, form)
-    errors = {
-        name: message
-        for name, message in field_problems(entry, parsed.inputs).items()
-        if name not in parsed.errors and name != "_unknown"
-    }
-    errors.update(parsed.errors)
     mode = parsed.engine
     base: dict[str, Any] = {
         "kind": "invalid",
         "mode": mode,
-        "fields": errors,
+        "fields": dict(parsed.errors),
         "message": None,
         "code": "INPUT",
         "position": None,
         "source": None,
     }
-    if errors:
-        base["message"] = "Please correct the highlighted values."
-        return _results(request, state, entry, base, parsed.values, 422)
+    # build_request is the single source of check order, shared with the JSON API; form
+    # values that failed to parse are merged into its field errors (and win over "missing").
     try:
         run_request = state.build_request(
             entry, mode, parsed.inputs, preset=parsed.preset, expression=parsed.expression
         )
     except FieldErrors as exc:
-        base.update(fields=exc.fields, message="Please correct the highlighted values.")
+        fields = {name: message for name, message in exc.fields.items() if name != "_unknown"}
+        fields.update(parsed.errors)
+        base.update(fields=fields, message="Please correct the highlighted values.")
         return _results(request, state, entry, base, parsed.values, 422)
     except ExpressionError as exc:
         base.update(
@@ -207,6 +201,9 @@ async def program_run(request: Request, program_id: str) -> HTMLResponse:
         return _results(request, state, entry, base, parsed.values, 422)
     except InputError as exc:
         base.update(code=exc.code, message=exc.message)
+        return _results(request, state, entry, base, parsed.values, 422)
+    if parsed.errors:
+        base["message"] = "Please correct the highlighted values."
         return _results(request, state, entry, base, parsed.values, 422)
     try:
         outcome = await run_in_threadpool(state.run, entry, mode, run_request)
