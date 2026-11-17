@@ -1,12 +1,14 @@
 """Functional tests of the compiled Fortran 2018 drivers in build/bin (book data cards on stdin)."""
 
-from conftest import run_driver, trace_records
-
-BISECTION_CARD = "0. 1. 1.E-5\n"
-BAIRSTOW_CARD = "0. 1. -17.8 99.41 -261.218 352.611 -134.106\n0. 0. 1.E-5 20 5\n"
-SIMPSON_CARD = "5.0 100\n"
-ROMBERG_CARD = "15.0 2.E-7\n"
-LAGRANGE_CARD = "05\n2.3756 1.6\n3.2682 1.9\n4.4571 2.2\n6.0502 2.5\n8.1919 2.8\n5.0\n"
+from conftest import (
+    BAIRSTOW_CARD,
+    BISECTION_CARD,
+    LAGRANGE_CARD,
+    ROMBERG_CARD,
+    SIMPSON_CARD,
+    run_driver,
+    trace_records,
+)
 
 
 class TestBisectionDriver:
