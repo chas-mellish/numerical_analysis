@@ -1,0 +1,307 @@
+# Chapter 1, Program 1: solution of F(X) = 0 by interval halving (bisection).
+# Schema: docs/architecture.md, "Catalog schema". Transcribed from docs/chapter_01_program_01_listing.pdf
+# (book page 24); every value below was read from the scan, not from the OCR text.
+
+id = "ch01_p01"
+title = "Interval halving (bisection)"
+method = "Bisection"
+summary = """
+Interval halving finds a root of F(X) = 0 inside an interval [X1, X2] on which F changes sign.
+Each pass evaluates F at the midpoint X = (X1 + X2)/2 and keeps the half-interval whose end
+values still have opposite signs, so the bracket is halved on every iteration. The book's program
+stops as soon as |F(X)| <= TOL (a residual test, not an interval-width test) and gives up after
+25 halvings. With the data card 0. 1. 1.E-5 and F(X) = EXP(-X) - SIN(3.1415926*X/2.) it reports
+the root .4435729 after 15 iterations.
+"""
+book_ref_confirmed = true
+precision_notes = """
+The book ran in single precision on 1970s hardware. Every midpoint X is a dyadic fraction
+(a multiple of 2**-k), so X is exact in both real32 and real64 and the 15 midpoints agree bit for bit;
+only F(X) differs, by about 1e-7 (row 15: 9.99e-7 in real64, 1.07e-6 in real32, both printed .000001).
+Both precisions therefore stop after the same 15 iterations, at X = 0.443572998046875.
+
+The line printer truncated rather than rounded the last printed digit and suppressed the leading
+zero: row 8 prints .4414062 for X = 0.44140625 and the root prints .4435729 for 0.4435729980.
+A modern compiler rounds and prints 0.4414063 and 0.4435730, so the golden tests compare X within
+1e-7 and F(X) within 1e-6 instead of comparing text. The constant 3.1415926 is the book's
+truncated pi and is kept on purpose: it is part of the book's F(X).
+"""
+book_output = """
+AT X =   .5000000 F(X) =   -.100576
+AT X =   .2500000 F(X) =    .396117
+AT X =   .3750000 F(X) =    .131719
+AT X =   .4375000 F(X) =    .011255
+AT X =   .4687500 F(X) =   -.045774
+AT X =   .4531250 F(X) =   -.017534
+AT X =   .4453125 F(X) =   -.003207
+AT X =   .4414062 F(X) =    .004006
+AT X =   .4433593 F(X) =    .000395
+AT X =   .4443359 F(X) =   -.001407
+AT X =   .4438476 F(X) =   -.000506
+AT X =   .4436035 F(X) =   -.000055
+AT X =   .4434814 F(X) =    .000170
+AT X =   .4435424 F(X) =    .000057
+AT X =   .4435729 F(X) =    .000001
+THE VALUE, X =   .4435729 IS A ROOT.  15 ITERATIONS WERE REQUIRED.
+"""
+
+[book_ref]
+chapter = 1
+program = 1
+page = 24
+title = "Solution of Nonlinear Equations"
+
+# ------------------------------------------------------------------ inputs (data-card order)
+# READ 100, X1, X2, TOL   /   100 FORMAT (2F10.0, E10.0)
+
+[[inputs]]
+name = "x1"
+type = "real"
+label = "X1"
+default = 0.0
+min = -1000.0
+max = 1000.0
+help = "Left end of the starting interval. F(X1) and F(X2) must have opposite signs."
+card = 1
+
+[[inputs]]
+name = "x2"
+type = "real"
+label = "X2"
+default = 1.0
+min = -1000.0
+max = 1000.0
+help = "Right end of the starting interval."
+card = 1
+
+[[inputs]]
+name = "tol"
+type = "real"
+label = "TOL"
+default = 1.0e-5
+min = 1.0e-12
+max = 1.0
+help = "Stop when |F(X)| <= TOL at the midpoint (the book tests the residual, not the interval width)."
+card = 1
+
+[data_card]
+# Columns 1-10, 11-20 and 21-30 of the card (FORMAT 2F10.0, E10.0); the card after it reads ZZZZ.
+text = "0.        1.        1.E-5"
+values = { x1 = 0.0, x2 = 1.0, tol = 1.0e-5 }
+note = "Drivers read the card list-directed, so the printed card works unchanged."
+
+# ------------------------------------------------------------------ function presets (DD3)
+
+[function]
+takes_function = true
+variable = "x"
+default_preset = 1
+
+[[function.presets]]
+id = 1
+label = "Book: exp(-x) - sin(pi x / 2)"
+expr = "EXP(-X) - SIN(3.1415926*X/2.)"
+fortran_preset = 1
+note = "The book's function card F(X) = EXPF(-X) - SINF(3.1415926*X/2.), with its truncated pi."
+
+[[function.presets]]
+id = 2
+label = "x^3 - x - 1"
+expr = "x**3 - x - 1"
+fortran_preset = 2
+note = "Real root 1.3247... (the plastic number); bracket it with X1 = 1, X2 = 2."
+
+[[function.presets]]
+id = 3
+label = "cos(x) - x"
+expr = "cos(x) - x"
+fortran_preset = 3
+note = "Root 0.7390851... (the Dottie number); bracketed by the book's interval [0, 1]."
+
+# ------------------------------------------------------------------ trace protocol (DD2)
+
+[trace]
+step_columns = [
+    { key = "k", label = "I", format = "I3" },
+    { key = "x1", label = "X1", format = "F10.7" },
+    { key = "x2", label = "X2", format = "F10.7" },
+    { key = "x", label = "X", format = "F10.7" },
+    { key = "fx", label = "F(X)", format = "F10.6" },
+]
+records = []
+result_extras = [
+    { key = "root_at_endpoint", type = "bool", description = "X1 or X2 is already a root (iterations = 0, book FORMAT 201)." },
+]
+
+# ------------------------------------------------------------------ golden expectations (DD4)
+
+[[expected]]
+name = "root"
+kind = "real"
+field = "value"
+description = "THE VALUE, X = .4435729 IS A ROOT."
+book_value = 0.4435729
+tol_real64 = 1.0e-7
+tol_real32 = 1.0e-7
+real64_value = 0.443572998046875
+tol_real64_value = 1.0e-12
+
+[[expected]]
+name = "iterations"
+kind = "int"
+description = "15 ITERATIONS WERE REQUIRED. (identical in real32 and real64)"
+book_value = 15
+
+[[expected]]
+name = "steps"
+kind = "rows"
+description = "The 15 printed AT X = ... F(X) = ... rows (book digits are truncated, not rounded)."
+columns = ["k", "x", "fx"]
+tol_real64 = { x = 1.0e-7, fx = 1.0e-6 }
+tol_real32 = { x = 1.0e-7, fx = 1.0e-6 }
+book_value = [
+    [1, 0.5000000, -0.100576],
+    [2, 0.2500000, 0.396117],
+    [3, 0.3750000, 0.131719],
+    [4, 0.4375000, 0.011255],
+    [5, 0.4687500, -0.045774],
+    [6, 0.4531250, -0.017534],
+    [7, 0.4453125, -0.003207],
+    [8, 0.4414062, 0.004006],
+    [9, 0.4433593, 0.000395],
+    [10, 0.4443359, -0.001407],
+    [11, 0.4438476, -0.000506],
+    [12, 0.4436035, -0.000055],
+    [13, 0.4434814, 0.000170],
+    [14, 0.4435424, 0.000057],
+    [15, 0.4435729, 0.000001],
+]
+
+# ------------------------------------------------------------------ files
+
+[files]
+legacy = ["legacy_code/fortran/chapter_1/bisection.f90"]
+scan_pdf = "docs/chapter_01_program_01_listing.pdf"
+fortran_module = "fortran/src/bisection_mod.f90"
+fortran_app = "fortran/app/ch01_p01_bisection.f90"
+fortran_executable = "ch01_p01_bisection"
+python_callable = "gerald_na.algorithms.bisection:bisection"
+study_page = "content/ch01_p01.md"
+
+[chart]
+kind = "bracket"
+options = { lower_key = "x1", upper_key = "x2", point_key = "x", residual_key = "fx", log_residual = true }
+
+# ------------------------------------------------------------------ practice questions
+# Reference answers computed with the book algorithm in real64 (identical in real32).
+
+[[practice]]
+id = "book-iterations"
+prompt = "Run the book's data card (0. 1. 1.E-5). How many halvings does the program need before |F(X)| <= TOL?"
+answer_field = "iterations"
+answer = 15
+tolerance = 0.0
+explanation = "Row 15 is the first midpoint with |F(X)| <= 1e-5 (F = 9.99e-7). Row 14 still has F = 5.7e-5."
+
+[[practice]]
+id = "loose-tol-iterations"
+prompt = "Keep X1 = 0 and X2 = 1 but loosen TOL to 1.E-3. How many iterations are required now?"
+inputs = { tol = 1.0e-3 }
+answer_field = "iterations"
+answer = 9
+tolerance = 0.0
+explanation = "The book table shows |F(X)| = .000395 at row 9, the first residual below 1e-3, so the run stops there."
+
+[[practice]]
+id = "loose-tol-root"
+prompt = "With TOL = 1.E-3, what root does the program report? Give it to 6 decimals."
+inputs = { tol = 1.0e-3 }
+answer_field = "value"
+answer = 0.443359375
+tolerance = 5.0e-6
+explanation = "The run stops at the 9th midpoint, X = 0.443359375, which is 2.1e-4 from the true root: a residual test says nothing directly about the error in X."
+
+[[practice]]
+id = "cubic-root"
+prompt = "Choose preset 2 (x^3 - x - 1) with X1 = 1, X2 = 2 and TOL = 1.E-5. What root is found?"
+inputs = { x1 = 1.0, x2 = 2.0 }
+preset = 2
+answer_field = "value"
+answer = 1.3247184753417969
+tolerance = 5.0e-6
+explanation = "F(1) = -1 and F(2) = 5 bracket the root; after 18 halvings |F(X)| <= 1e-5 at X = 1.3247185."
+
+[[practice]]
+id = "dottie-iterations"
+prompt = "Choose preset 3 (cos(x) - x) on the book interval [0, 1] with TOL = 1.E-5. How many iterations are needed?"
+preset = 3
+answer_field = "iterations"
+answer = 16
+tolerance = 0.0
+explanation = "The root is 0.7390851; the 16th midpoint, X = 0.7390900, is the first with |F(X)| <= 1e-5."
+
+# ------------------------------------------------------------------ errata
+# Mirrored in the ERRATA header of fortran/app/ch01_p01_bisection.f90 and on content/ch01_p01.md.
+
+[[errata]]
+id = "zero-product-branch"
+kind = "rewrite_drift"
+original = "legacy bisection.f90: if (fx * fx1 < 0.0) then x2 = x else x1 = x; fx1 = fx"
+corrected = "9 IF (FX*FX1) 10, 11, 12  with  11 PRINT 205 / 205 FORMAT (7H ERROR. )"
+note = "The scan has a third branch: an exactly zero product F(X)*F(X1) prints ERROR. and stops. The modern code restores it as the ZERO_PRODUCT error (ZeroProductError)."
+
+[[errata]]
+id = "non-convergence-message"
+kind = "rewrite_drift"
+original = "Error: maximum iterations exceeded without convergence."
+corrected = "PRINT 204 / 204 FORMAT (33H NON-CONVERGENT IN 25 ITERATIONS. )"
+note = "Restored the book's message after the DO 30 I = 1, 25 loop; trace mode reports NON_CONVERGENT (NonConvergenceError)."
+
+[[errata]]
+id = "endpoint-root-format"
+kind = "rewrite_drift"
+original = "print '(A,F10.7,A)', \"The input value X = \", x1, \" is a root of the equation.\""
+corrected = "201 FORMAT (22H THE INPUT VALUE, X = ,F6.3, 27H IS A ROOT OF THE EQUATION. )"
+note = "The book prints an input value that is already a root with F6.3, not F10.7. In trace mode this is a RESULT with root_at_endpoint=T and iterations=0."
+
+[[errata]]
+id = "product-zero-test-order"
+kind = "rewrite_drift"
+original = "else if (fx1 == 0.0 .and. fx2 == 0.0) then print *, \"Error: FX1 and FX2 not zero though product tests zero.\""
+corrected = "2 IF (FX1) 4, 5, 4 / 4 IF (FX2) 6, 7, 6 / 6 PRINT 202  (202: ERROR. FX1 AND FX2 NOT ZERO THOUGH PRODUCT TESTS ZERO.)"
+note = "The rewrite printed this message when both values are zero, the opposite of its wording. The book reaches label 6 only when FX1*FX2 tests zero (underflow) although neither FX1 nor FX2 is zero; the order X1-root, X2-root, error is restored."
+
+[[errata]]
+id = "hard-coded-inputs"
+kind = "rewrite_drift"
+original = "x1 = 0.0; x2 = 1.0; tol = 1.0e-5 (assigned in the program)"
+corrected = "READ 100, X1, X2, TOL / 100 FORMAT (2F10.0, E10.0)"
+note = "The driver reads the book's data card from stdin again (list-directed, same order), so 0. 1. 1.E-5 works unchanged."
+
+[[errata]]
+id = "line-layout"
+kind = "rewrite_drift"
+original = "'(A,F10.7,A,F10.6)' with \"AT X = \" and \"  F(X) = \"; \"THE VALUE X = \""
+corrected = "206 FORMAT (8H AT X = , F10.7, 8H F(X) = ,F10.6) and 203 FORMAT (16H THE VALUE, X = ,F10.7, 12H IS A ROOT. , I3, 26H ITERATIONS WERE REQUIRED. )"
+note = "Hollerith field widths restored, including the comma in THE VALUE, X = and the blank carriage-control column."
+
+[[errata]]
+id = "bracket-message-unit"
+kind = "original_quirk"
+original = "3 TYPE 200 (console typewriter)"
+corrected = "message written to standard output with the rest of the run, so the engines and the UI capture it"
+note = "Only the opposite-signs message went to the console typewriter in the original; all other output went to the line printer. 200 FORMAT: FUNCTION VALUES WITH INITIAL X VALUES ARE NOT OF OPPOSITE SIGNS. CHANGE INPUTS."
+
+[[errata]]
+id = "truncated-digits"
+kind = "original_quirk"
+original = ".4414062, .4433593, .4438476, .4435424, .4435729 (printed)"
+corrected = "0.4414063, 0.4433594, 0.4438477, 0.4435425, 0.4435730 (gfortran F10.7 rounds)"
+note = "The 1970s line printer truncated the last digit and dropped the leading zero. Not a code change: the golden tests compare numbers within 1e-7 rather than text."
+
+[[errata]]
+id = "structured-control-flow"
+kind = "modernization"
+original = "arithmetic IF (FX1*FX2) 1, 2, 3 / GO TO 30 / CALL EXIT; statement function F(X) = EXPF(-X) - SINF(...)"
+corrected = "IF/SELECT CASE blocks, a DO loop with EXIT, STOP with exit status; F passed as a procedure argument (--preset N)"
+note = "Branch semantics are kept exactly, including the zero branches of every arithmetic IF; EXPF/SINF become EXP/SIN."

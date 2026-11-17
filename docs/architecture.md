@@ -167,6 +167,145 @@ entry and is resolved under the repository root (`repo_root` from settings). No 
 paths are accepted, which rules out path traversal and keeps the files in one place. The container
 image therefore includes `docs/`, `legacy_code/`, `fortran/`, `catalog/`, `content/` and `python/`.
 
+## Catalog schema
+
+Each book program is described once in `catalog/<id>[_<name>].toml`. The file name must be the id
+or start with `<id>_`. `gerald_na.registry` loads every file with `tomllib` into frozen pydantic v2
+models that reject unknown keys (`gerald_na.registry.models.CatalogEntry`), so a misspelt key is an
+error. The catalog drives the UI forms, the golden tests, the Fortran test fixtures and the README
+index. **Adding a future chapter's program means adding one catalog file plus the two
+implementations**, then running `gerald-na catalog check`. `catalog/ch01_p01_bisection.toml` is
+the reference example.
+
+### Top-level keys
+
+| Key | Type | Meaning |
+|---|---|---|
+| `id` | string | Catalog id: `chNN_pNN` for confirmed book programs (it must match `book_ref`), otherwise a slug such as `lagrange_interpolation` |
+| `title`, `method`, `summary` | string | Display title, method name, and a paragraph describing the method and the book's run |
+| `book_ref_confirmed` | bool | `true` requires `book_ref.chapter`, `program` and `page` |
+| `precision_notes` | string | Real32 versus real64 versus book digits; shown on the study page |
+| `book_output` | string | The line-printer output exactly as printed in the scan (carriage-control column dropped, leading zeros suppressed as printed) |
+
+### Tables
+
+* **`[book_ref]`** (optional): `chapter`, `program`, `page`, `title` (the chapter title as
+  printed), each optional (DD1).
+* **`[[inputs]]`** (at least one), in data-card order:
+  * `name`: lower-case identifier, the Python keyword argument.
+  * `type`: `real`, `int`, `real_list` or `point_list` (a list of `[x, y]` pairs).
+  * `label`, `help`: UI text.
+  * `default`: the book data card's value.
+  * `min`, `max` (optional): inclusive bounds, applied to every number of a list.
+  * `card`: 1-based data card number. Cards must run from 1 without gaps; inputs are read card
+    by card in declaration order.
+  * `length` (optional, lists only): fixed list length.
+* **`[data_card]`**:
+  * `text`: the card(s) exactly as printed, possibly multi-line.
+  * `values`: one entry per input.
+  * `note` (optional).
+
+  Validation checks that `values` equal the input defaults and that the list-directed fields of
+  `text` (separated by blanks or commas; Fortran reals like `0.`, `1.E-5`, `1.D-3` are accepted)
+  are, in order, the flattened defaults. Integer inputs need integer fields.
+* **`[function]`**:
+  * `takes_function`: bool.
+  * `variable`: default `"x"`.
+  * `default_preset`: required when the program takes a function.
+  * `[[function.presets]]`: `id`, `label`, `expr` (compiled by `gerald_na.expr`), `fortran_preset`
+    (must equal `id`; the value passed to `--preset`), and an optional `note`.
+
+  Programs that take data instead of a function (Bairstow, Lagrange) declare
+  `takes_function = false` and no presets (DD3).
+* **`[trace]`** (DD2):
+  * `step_columns`: list of `{key, label, format}`. The `key` is the `STEP` record key and the
+    Python step attribute; the `format` is a Fortran edit descriptor (`I3`, `F10.7`, `E15.7`,
+    `ES25.17`, `G0`, `Ln`, `A`). `I` columns are integers and are compared exactly.
+  * `records`: extra record types, each `{type, fields, description}`, for example Bairstow's
+    `FACTOR`.
+  * `result_extras`: extra `RESULT` keys, each `{key, type = real|int|bool|text, description}`.
+    They may not redefine `value`, `converged` or `iterations`.
+* **`[[expected]]`** (DD4, at least one):
+  * `name`: unique identifier.
+  * `field` (optional, default `name`): the result attribute compared.
+  * `description` (optional).
+  * `kind` and `book_value`, the value transcribed from the scan:
+    * `real`: a number.
+    * `int`: an exact integer.
+    * `text`: an exact string.
+    * `table`: a ragged list of rows, for example Romberg's triangle.
+    * `rows`: a list of rows whose cells correspond to `columns`, a list of step keys.
+  * `tol_real64`, `tol_real32`: absolute tolerances. They are required for `real`, `table` and
+    `rows`, and forbidden for `int` and `text`. For `rows` they may be a per-column table such as
+    `{ x = 1e-7, fx = 1e-6 }`; columns without an entry are compared exactly.
+  * `real64_value` with `tol_real64_value` (optional, together): the tighter real64 reference, in
+    the same shape as `book_value`.
+* **`[files]`**: paths are relative POSIX paths under the repository root. Absolute paths, `..`,
+  `.`, empty segments and backslashes are rejected.
+  * `legacy`: list of at least one path.
+  * `scan_pdf`: optional; absent means "no scan available".
+  * `fortran_module`, `fortran_app`.
+  * `fortran_executable`: the name in `build/bin`; it must be the id or start with `<id>_`.
+  * `python_callable`: `module.path:function`.
+  * `study_page`.
+* **`[chart]`**:
+  * `kind`: one of `bracket`, `abs_residual`, `romberg_heatmap`, `integrand_panels`, `factors`,
+    `interpolant`.
+  * `options`: a free-form table of scalars or lists.
+* **`[[practice]]`**:
+  * `id`: slug, cited as `[id]` on the study page.
+  * `prompt`.
+  * `inputs`: overrides of the defaults, validated against the inputs' types and bounds.
+  * `preset` (optional): a preset id.
+  * `answer_field`: `value`, `iterations`, `converged` or a result extra.
+  * `answer` (optional): reference answer, as computed by the engines.
+  * `tolerance`.
+  * `explanation`.
+
+  The web layer checks a learner's answer by running an engine with the overrides
+  (`CatalogEntry.practice_inputs`).
+* **`[[errata]]`**:
+  * `id`.
+  * `kind`, one of:
+    * `ocr_slip`: an error in the text transcription.
+    * `original_bug`: a genuine bug in the book's program.
+    * `original_quirk`: odd but intended behaviour of the original.
+    * `rewrite_drift`: where an earlier partial rewrite in `legacy_code/` departed from the scan.
+    * `modernization`: a deliberate change made by the modern code.
+  * `original`, `corrected`, `note`.
+
+  Every erratum is mirrored in the Fortran ERRATA header and the study-page errata table.
+
+### Registry API
+
+* `Registry.load(repo_root)` validates every file. It raises `CatalogError` naming the file on
+  invalid TOML or schema errors.
+* `.programs` lists programs ordered by (chapter, program). Unconfirmed references come last,
+  sorted by id.
+* `.get(id)` returns one program.
+* `.by_chapter()` groups programs by confirmed chapter; the key `None` holds the unconfirmed
+  ones.
+* `get_registry()` is the cached registry for `get_settings().repo_root`.
+* `resolve_path(entry, kind)` is the whitelist used by `GET /files/{program_id}/{kind}` (DD5):
+  * `kind` is one of `scan`, `legacy`, `fortran_module`, `fortran_app`, `python`, `study` or
+    `catalog`.
+  * Only paths named by a catalogued entry can be produced.
+  * The resolved path, after following symlinks, must stay under the repository root; otherwise
+    it raises `CatalogPathError`. `python` maps the callable's module to its file under
+    `python/src/`.
+* `check_integrity()` returns the list of problems:
+  * duplicate ids, file names that do not match the id, and shared executables;
+  * missing referenced files: legacy, the scan when one is named, Fortran module and app, and
+    study page;
+  * a Python callable that cannot be imported or is not callable;
+  * blank preset expressions, or ones that do not compile;
+  * defaults or practice overrides out of bounds.
+
+  Files that no entry references, such as the un-migrated Chapter 4/5 PDFs, are never inspected.
+  `gerald-na catalog check` prints the problems and exits with status 1. `gerald-na catalog list`
+  prints the index. The test `python/tests/unit/test_catalog_integrity.py` requires an empty
+  list.
+
 ## Conventions
 
 * Python results are frozen dataclasses with `value`, `converged`, `iterations`, `steps` and a
