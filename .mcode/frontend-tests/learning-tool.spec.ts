@@ -1,12 +1,5 @@
-import { test, expect, Page } from "@playwright/test";
-
-const T = (page: Page, id: string) => page.getByTestId(id);
-
-async function run(page: Page, engine?: "python" | "fortran" | "compare") {
-  if (engine) await page.locator(`#engine-${engine}`).check();
-  await T(page, "run-button").click();
-  await expect(T(page, "results-body").or(T(page, "validation-error")).first()).toBeVisible({ timeout: 20000 });
-}
+import { test, expect } from "@playwright/test";
+import { T, run } from "./helpers";
 
 test.describe("Home", () => {
   test("lists programs by chapter, Lagrange under unconfirmed", async ({ page }) => {

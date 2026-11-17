@@ -1,12 +1,5 @@
-import { test, expect, Page } from "@playwright/test";
-
-const T = (page: Page, id: string) => page.getByTestId(id);
-
-async function run(page: Page, engine?: "python" | "fortran" | "compare") {
-  if (engine) await page.locator(`#engine-${engine}`).check();
-  await T(page, "run-button").click();
-  await expect(T(page, "results-body").or(T(page, "validation-error")).first()).toBeVisible({ timeout: 20000 });
-}
+import { test, expect } from "@playwright/test";
+import { T, run } from "./helpers";
 
 test.describe("Re-validation extras", () => {
   test("bisection python result is 0.4435729 / 15 iterations with charts", async ({ page }) => {
