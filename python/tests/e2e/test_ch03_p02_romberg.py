@@ -1,5 +1,7 @@
 """E2E: Chapter 3, Program 2, Romberg integration for Si(B), in a real browser."""
 
+from pathlib import Path
+
 import pytest
 from playwright.sync_api import Page, expect
 
@@ -43,6 +45,34 @@ def test_romberg_fortran_and_compare(page: Page, live_server: LiveServer) -> Non
     program.select_engine("compare")
     program.run()
     program.expect_compare_match(golden(ENTRY).rows)
+
+
+@pytest.mark.fortran
+def test_romberg_compare_fits_at_1280(
+    page: Page, live_server: LiveServer, output_path: str
+) -> None:
+    """QA: at 1280px the compare tables and book text are not cut off on the right."""
+    reason = live_server.engine_reason(ENTRY.id, "compare")
+    if reason is not None:
+        pytest.skip(reason)
+    page.set_viewport_size({"width": 1280, "height": 900})
+    program = ProgramPage(page, ENTRY).open()
+    program.select_engine("compare")
+    program.run()
+    program.expect_compare_match(golden(ENTRY).rows)
+    program.expect_compare_fully_visible()
+    page.screenshot(path=Path(output_path) / "romberg-compare-1280.png", full_page=True)
+
+
+def test_romberg_out_of_range_then_reset(page: Page) -> None:
+    """A TOL above its maximum marks #in-tol invalid; reset restores the card and clears results."""
+    program = ProgramPage(page, ENTRY).open()
+    program.fill(tol="5")
+    program.run()
+    program.expect_field_error("tol")
+    program.reset()
+    program.expect_no_field_errors()
+    expect(program.tid("validation-error")).to_have_count(0)
 
 
 def test_romberg_custom_function(page: Page) -> None:

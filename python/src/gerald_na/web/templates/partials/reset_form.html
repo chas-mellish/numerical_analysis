@@ -1,0 +1,4 @@
+{# Reset button response: the run form on the book data card, and (out of band) the empty results
+   area, so the results or errors of the previous run do not stay next to the reset form. #}
+{% include "partials/run_form.html" %}
+<div id="results" hx-swap-oob="innerHTML">{% include "partials/results_placeholder.html" %}</div>

@@ -7,7 +7,7 @@
     {% if r.fields %}
     <ul class="field-errors">
       {% for name, message in r.fields.items() %}
-      <li data-testid="field-error-{{ name }}"><strong>{{ entry.input(name).label if name in entry.input_names else name }}</strong>: {{ message }}</li>
+      <li id="field-error-{{ name }}" data-field-error="{{ name }}" data-testid="field-error-{{ name }}"><strong>{{ entry.input(name).label if name in entry.input_names else name }}</strong>: {{ message }}</li>
       {% endfor %}
     </ul>
     {% endif %}

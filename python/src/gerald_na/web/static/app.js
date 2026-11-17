@@ -210,6 +210,63 @@
     }
   });
 
+  // ------------------------------------------------------------ field errors
+  // After a run, mark the inputs named by the results' field errors (li[data-field-error],
+  // id "field-error-<name>"): aria-invalid, the .invalid style and aria-describedby pointing at
+  // the message. Marks from the previous run are cleared first, so a successful run clears all.
+  function fieldControls(form, name) {
+    if (name === "expression") return [form.querySelector("[data-custom-expr]")];
+    if (name === "function") return [form.querySelector("[data-function-select]")];
+    var list = null;
+    form.querySelectorAll("[data-list-name]").forEach(function (fieldset) {
+      if (fieldset.dataset.listName === name) list = fieldset;
+    });
+    if (list) {
+      return [list].concat(Array.prototype.slice.call(list.querySelectorAll("input")));
+    }
+    return [document.getElementById("in-" + name)];
+  }
+
+  function describedBy(el, id, add) {
+    var tokens = (el.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (t) {
+      return t && t !== id;
+    });
+    if (add) tokens.push(id);
+    if (tokens.length) el.setAttribute("aria-describedby", tokens.join(" "));
+    else el.removeAttribute("aria-describedby");
+  }
+
+  function clearFieldErrors(form) {
+    form.querySelectorAll(".invalid, [aria-invalid]").forEach(function (el) {
+      el.classList.remove("invalid");
+      if (el.tagName !== "FIELDSET") el.removeAttribute("aria-invalid");
+      var tokens = (el.getAttribute("aria-describedby") || "").split(/\s+/);
+      tokens.forEach(function (t) {
+        if (t.indexOf("field-error-") === 0) describedBy(el, t, false);
+      });
+    });
+  }
+
+  function markFieldErrors(results) {
+    var form = document.querySelector("form.run-form");
+    if (!form || !results) return;
+    clearFieldErrors(form);
+    results.querySelectorAll("[data-field-error]").forEach(function (item) {
+      var name = item.dataset.fieldError;
+      fieldControls(form, name).forEach(function (el) {
+        if (!el) return;
+        el.classList.add("invalid");
+        if (el.tagName !== "FIELDSET") el.setAttribute("aria-invalid", "true");
+        describedBy(el, item.id, true);
+      });
+    });
+  }
+
+  document.addEventListener("htmx:afterSwap", function (event) {
+    var target = event.detail && event.detail.target;
+    if (target && target.id === "results") markFieldErrors(target);
+  });
+
   function init(root) {
     renderCharts(root);
     var forms = root.querySelectorAll ? root.querySelectorAll("form.run-form") : [];

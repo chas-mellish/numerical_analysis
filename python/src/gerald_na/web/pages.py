@@ -2,7 +2,8 @@
 
 * ``GET /`` -- programs grouped by chapter.
 * ``GET /programs/{id}`` -- form, engine selector, results area, tabs and practice questions.
-* ``GET /programs/{id}/form`` -- the run form prefilled with the book card (reset button).
+* ``GET /programs/{id}/form`` -- the run form prefilled with the book card (reset button), with
+  an out-of-band swap clearing the results area.
 * ``POST /programs/{id}/run`` -- the results fragment (the full page when not sent by HTMX).
   422 for invalid input, 503 for an unavailable engine, 200 for every completed run (including
   the book's error paths, shown with their code).
@@ -128,11 +129,12 @@ def program_page(request: Request, program_id: str) -> HTMLResponse:
 
 @router.get("/programs/{program_id}/form", response_class=HTMLResponse, name="program_form")
 def program_form(request: Request, program_id: str) -> HTMLResponse:
-    """The run form reset to the book data card."""
+    """The run form reset to the book data card, plus an out-of-band swap that puts the results
+    placeholder back into ``#results`` so no stale results or errors stay on screen."""
     state = get_state(request)
     entry = _entry(state, program_id)
     return templates.TemplateResponse(
-        request, "partials/run_form.html", _form_context(state, entry)
+        request, "partials/reset_form.html", _form_context(state, entry)
     )
 
 
@@ -154,6 +156,10 @@ def _results(
     context = _page_context(state, entry)
     context.update(_form_context(state, entry, values))
     context["results"] = results
+    if results.get("kind") == "invalid":
+        context["field_errors"] = {
+            name: message for name, message in results["fields"].items() if name != "_unknown"
+        }
     return templates.TemplateResponse(request, "program.html", context, status_code=status_code)
 
 

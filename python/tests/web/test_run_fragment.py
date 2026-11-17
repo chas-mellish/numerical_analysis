@@ -232,3 +232,85 @@ def test_point_list_validation(synthetic_client: TestClient, synthetic_adapter: 
     assert 'data-testid="field-error-points"' in response.text
     assert "entry 3" in response.text
     assert 'data-testid="field-error-xin"' in response.text
+
+
+def form_control(html: str, testid: str) -> str:
+    pattern = rf'<(?:input|select|fieldset)[^>]*data-testid="{re.escape(testid)}"[^>]*>'
+    match = re.search(pattern, html, re.S)
+    assert match is not None, testid
+    return match.group(0)
+
+
+def test_field_errors_carry_ids_for_aria_describedby(client: TestClient) -> None:
+    """Each field-error message has the id the input's aria-describedby points at (QA finding)."""
+    status, html = run(client, book_form("python", in_x2="5000"))
+    assert status == 422
+    assert '<li id="field-error-x2" data-field-error="x2" data-testid="field-error-x2">' in html
+
+
+def test_full_page_marks_invalid_inputs(client: TestClient) -> None:
+    """Without HTMX the re-rendered form marks the offending input; the others stay clean."""
+    response = client.post(f"/programs/{BISECTION}/run", data=book_form("python", in_x2="5000"))
+    assert response.status_code == 422
+    x2 = form_control(response.text, "input-x2")
+    assert 'aria-invalid="true"' in x2
+    assert 'class="invalid"' in x2
+    assert 'aria-describedby="help-x2 field-error-x2"' in x2
+    assert 'id="field-error-x2"' in response.text
+    x1 = form_control(response.text, "input-x1")
+    assert "aria-invalid" not in x1
+    assert 'aria-describedby="help-x1"' in x1
+
+
+def test_full_page_marks_invalid_expression(client: TestClient) -> None:
+    form = book_form("python", function="custom", expression="x**3 - 2*y")
+    response = client.post(f"/programs/{BISECTION}/run", data=form)
+    assert response.status_code == 422
+    custom = form_control(response.text, "custom-expr")
+    assert 'aria-invalid="true"' in custom
+    assert 'aria-describedby="custom-expr-help field-error-expression"' in custom
+    assert 'id="field-error-expression"' in response.text
+
+
+def test_successful_full_page_run_has_no_invalid_marks(client: TestClient) -> None:
+    response = client.post(f"/programs/{BISECTION}/run", data=book_form("python"))
+    assert response.status_code == 200
+    assert "aria-invalid" not in response.text
+    assert 'class="invalid"' not in response.text
+    assert 'aria-describedby="help-x2"' in form_control(response.text, "input-x2")
+
+
+def test_point_list_errors_mark_the_rows(
+    synthetic_client: TestClient, synthetic_adapter: object
+) -> None:
+    """A list input with a field error marks its fieldset and every element input."""
+    form = {
+        "in_n": "3",
+        "in_points.x": ["1", "2", "x"],
+        "in_points.y": ["1", "4", "9"],
+        "in_xin": "1.5",
+        "engine": "python",
+    }
+    response = synthetic_client.post("/programs/synthetic_points/run", data=form)
+    assert response.status_code == 422
+    fieldset = form_control(response.text, "input-points")
+    assert 'class="list-input invalid"' in fieldset
+    assert 'aria-describedby="help-points field-error-points"' in fieldset
+    for testid in ("input-points-0-x", "input-points-2-y"):
+        row = form_control(response.text, testid)
+        assert 'aria-invalid="true"' in row
+        assert 'aria-describedby="field-error-points"' in row
+    assert "aria-invalid" not in form_control(response.text, "input-xin")
+
+
+def test_compare_traces_stack_when_narrow(client: TestClient) -> None:
+    """The compare columns get a 36rem minimum (stacked at 1280px) and scroll containers."""
+    css = client.get("/static/app.css").text
+    rule = re.search(r"\.compare-grid \{[^}]*\}", css)
+    assert rule is not None
+    assert "minmax(min(100%, 36rem), 1fr)" in rule.group(0)
+    status, html = run(client, book_form("compare"))
+    assert status == 200
+    for side in ("python", "fortran"):
+        column = html.split(f'data-testid="compare-{side}"', 1)[1]
+        assert column.index('class="table-wrap"') < column.index('data-testid="results-table"')

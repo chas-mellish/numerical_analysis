@@ -35,7 +35,7 @@
       {% if results %}
         {% include "partials/results.html" %}
       {% else %}
-        <p class="muted" data-testid="results-placeholder">Run the program to see the iteration table, the chart and the book-format output.</p>
+        {% include "partials/results_placeholder.html" %}
       {% endif %}
     </div>
   </section>

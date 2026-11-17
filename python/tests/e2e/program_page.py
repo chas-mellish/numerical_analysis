@@ -7,6 +7,7 @@ string ``wait_for_function`` calls cannot be used. Expected values come from the
 """
 
 import math
+import re
 from dataclasses import dataclass
 
 from playwright.sync_api import Locator, Page, expect
@@ -168,6 +169,58 @@ class ProgramPage:
             expect(column.get_by_test_id("step-row")).to_have_count(rows)
             expect(self.tid(f"book-text-{side}")).to_be_visible()
         expect(self.tid("diff-cell")).to_have_count(0)
+        self.expect_compare_fully_visible()
+
+    def expect_compare_fully_visible(self) -> None:
+        """Every compare-mode iteration table and book-text block fits its column (QA finding).
+
+        Each scroll container (``.table-wrap``, the ``<pre>``) must not overflow horizontally and
+        each side must stay inside the results panel, so no column or line is cut off.
+        """
+        panel = self.page.locator(".results-panel")
+        panel_box = panel.bounding_box()
+        assert panel_box is not None
+        right = panel_box["x"] + panel_box["width"]
+        for side in ("python", "fortran"):
+            column = self.tid(f"compare-{side}")
+            box = column.bounding_box()
+            assert box is not None
+            assert box["x"] + box["width"] <= right + 0.5, f"compare-{side} overflows the panel"
+            blocks = [column.locator(".table-wrap").first, self.tid(f"book-text-{side}")]
+            for block in blocks:
+                expect(block).to_be_visible()
+                overflow = block.evaluate("el => el.scrollWidth - el.clientWidth")
+                assert overflow <= 0, f"{self.entry.id} compare-{side}: clipped by {overflow}px"
+            last_header = column.locator("table.steps thead th").last
+            header_box = last_header.bounding_box()
+            assert header_box is not None
+            assert header_box["x"] + header_box["width"] <= box["x"] + box["width"] + 0.5
+
+    def expect_field_error(self, name: str) -> None:
+        """The input ``name`` is marked invalid and described by its ``field-error-<name>``."""
+        expect(self.tid(f"field-error-{name}")).to_be_visible()
+        expect(self.tid(f"field-error-{name}")).to_have_attribute("id", f"field-error-{name}")
+        control = self.tid(f"input-{name}")
+        expect(control).to_have_attribute("aria-invalid", "true")
+        expect(control).to_have_class(re.compile(r"\binvalid\b"))
+        described = re.compile(rf"\bfield-error-{name}\b")
+        expect(control).to_have_attribute("aria-describedby", described)
+
+    def expect_no_field_errors(self) -> None:
+        """No input of the run form is marked invalid or described by a field error."""
+        form = self.tid("run-form")
+        expect(form.locator("[aria-invalid]")).to_have_count(0)
+        expect(form.locator(".invalid")).to_have_count(0)
+        expect(form.locator('[aria-describedby*="field-error-"]')).to_have_count(0)
+
+    def reset(self) -> None:
+        """Click "Reset to book data card": the form returns to the card and results clear."""
+        with self.page.expect_response(
+            lambda response: response.url.endswith(f"/programs/{self.entry.id}/form")
+        ):
+            self.tid("reset-button").click()
+        expect(self.tid("results-placeholder")).to_be_visible()
+        expect(self.tid("results-body")).to_have_count(0)
 
     def run_book_card(self, engine: str) -> str:
         """Run the pre-filled book card on ``engine`` and check the golden value and row count."""

@@ -594,7 +594,7 @@ no CDN at runtime).
 | `GET /healthz` | liveness and engines |
 | `GET /` | programs grouped by confirmed chapter, then "Book reference unconfirmed" |
 | `GET /programs/{id}` | header, run form, results area, tabs, practice questions |
-| `GET /programs/{id}/form` | the run form reset to the book data card (HTMX fragment) |
+| `GET /programs/{id}/form` | the run form reset to the book data card (HTMX fragment), plus an out-of-band `<div id="results" hx-swap-oob="innerHTML">` holding `results-placeholder`, so a reset also clears stale results and errors |
 | `POST /programs/{id}/run` | results fragment (full page without the `HX-Request` header); 422 invalid input, 503 engine unavailable, 200 for every completed run including book error paths |
 | `POST /programs/{id}/practice/{question_id}` | feedback fragment; 422 when the answer cannot be read |
 | `GET /api/programs` | list: `id`, `title`, `method`, `book_ref`, `confirmed`, `book_ref_text`, `chapter`, `inputs` (catalog schema), `takes_function`, `default_preset`, `presets`, `engines` (available now, including `compare`), `scan_available`, `chart_kind`, `url`, `api_url` |
@@ -654,12 +654,23 @@ its kind and printed form, and one named row `extra-factors-<i>-<name>` per coef
 for a quadratic, `a2`, `a1`, `a0` for the final quadratic, `a1`, `a0` for the linear factor); the book text (`book-text`) and the verbose extras
 (`verbose-text`).
 
+Field errors: each `field-error-<name>` item also has `id="field-error-<name>"` and
+`data-field-error="<name>"`. The offending control (`#in-<name>`, every input of a list fieldset
+plus the fieldset's style, `#custom-expr` for `expression`, `#function-select` for `function`)
+gets `aria-invalid="true"`, `class="invalid"` and `field-error-<name>` appended to its
+`aria-describedby`: rendered by the server on the full-page (no-JS) POST, and applied by `app.js`
+after each HTMX swap into `#results`, which first clears the previous marks (so a successful run
+or a reset clears them).
+
 Compare mode: `compare-summary` (`data-matches`, `compare-verdict`, `compare-iterations` with
 `data-same`, `compare-status`, `compare-max-diff`, `compare-value-diff`, `compare-note`,
 `compare-columns`), the Python charts, and the two traces side by side (`compare-python`,
 `compare-fortran`, each with `book-text-python` / `book-text-fortran`). Differing cells carry
 `class="diff-cell"` and `data-testid="diff-cell"`, with the absolute and relative difference in
-the tooltip and `data-diff`.
+the tooltip and `data-diff`. The two sides sit next to each other only when each column gets at least
+36rem (`.compare-grid`, `minmax(min(100%, 36rem), 1fr)`); in the results panel of a 1280px window
+they stack, so iteration tables and book lines are shown whole (each `.table-wrap` and `<pre>`
+still scrolls on its own when wider; e2e `expect_compare_fully_visible` checks no overflow).
 
 ### Chart kinds (`[chart] kind` and `options`)
 

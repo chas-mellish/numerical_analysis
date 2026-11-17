@@ -147,6 +147,20 @@ def test_reset_form_fragment(client: TestClient) -> None:
     assert 'value="1e-05"' in input_tag(response.text, "input-tol")
 
 
+def test_reset_form_clears_results_out_of_band(client: TestClient) -> None:
+    """The reset response also swaps the placeholder into #results (QA: stale results stayed)."""
+    html = client.get(f"/programs/{BISECTION}/form").text
+    form_end = html.index("</form>")
+    oob = re.search(r'<div id="results" hx-swap-oob="innerHTML">(.*?)</div>', html, re.S)
+    assert oob is not None
+    assert oob.start() > form_end
+    assert 'data-testid="results-placeholder"' in oob.group(1)
+    assert "aria-invalid" not in html
+    assert 'class="invalid"' not in html
+    page = client.get(f"/programs/{BISECTION}").text
+    assert page.count('data-testid="results-placeholder"') == 1
+
+
 def test_unknown_program_page_is_404(client: TestClient) -> None:
     response = client.get("/programs/ch99_p99", headers={"accept": "text/html"})
     assert response.status_code == 404

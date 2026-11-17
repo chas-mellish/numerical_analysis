@@ -94,6 +94,11 @@ input[type="text"], select {
   padding: 0.35rem 0.5rem; border: 1px solid #b9b7b0; border-radius: 4px; background: #fff;
 }
 select { font-family: inherit; }
+input.invalid, select.invalid, input[aria-invalid="true"], select[aria-invalid="true"] {
+  border-color: var(--error-ink); background: var(--error-bg);
+  box-shadow: 0 0 0 1px var(--error-ink);
+}
+fieldset.list-input.invalid { border: 1px solid var(--error-ink); }
 .list-input { border: 1px dashed var(--border); border-radius: var(--radius); padding: 0.5rem; }
 .list-input .rows { padding-left: 0; list-style: none; margin: 0.4rem 0; }
 .list-input .row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.3rem; }
@@ -129,7 +134,8 @@ dl.summary dd.value { font-size: 1.25rem; font-weight: 600; }
 .charts { display: grid; gap: 0.8rem; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   margin-bottom: 1rem; }
 .chart { min-height: 360px; border: 1px solid var(--grid); border-radius: var(--radius); background: var(--surface-1); }
-.table-wrap { overflow-x: auto; margin-bottom: 1rem; }
+.table-wrap { overflow-x: auto; margin-bottom: 1rem; max-width: 100%; }
+.table-wrap, .book-text pre, pre.verbose { scrollbar-width: thin; }
 table { border-collapse: collapse; font-size: 0.875rem; }
 caption { text-align: left; color: var(--text-secondary); font-size: 0.85rem; padding-bottom: 0.3rem; }
 th, td { padding: 0.25rem 0.7rem; border-bottom: 1px solid var(--grid); text-align: right; }
@@ -155,7 +161,11 @@ figure { margin: 0 0 1rem; }
 .compare-summary.agree { background: var(--ok-bg); }
 .compare-summary.differ { background: var(--warn-bg); }
 .compare-summary h3 { margin: 0 0 0.3rem; font-size: 1rem; }
-.compare-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+/* The two engine traces sit side by side only when each column can show a whole iteration table
+   and book line (about 36rem); in a narrower results panel (1280px windows and below) they stack,
+   so nothing is cut off. Each table and <pre> still scrolls on its own if it is wider. */
+.compare-grid { display: grid; gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 36rem), 1fr)); }
 .compare-side { min-width: 0; }
 .compare-side h3 { margin-top: 0; }
 
