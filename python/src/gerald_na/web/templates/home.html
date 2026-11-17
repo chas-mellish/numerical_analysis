@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="page-title">Programs</h1>
+<p class="lead">Each program is a FORTRAN listing from C. F. Gerald's <em>Applied Numerical Analysis</em>,
+  modernized to Fortran 2018 and ported to Python. Run either engine on the book's data card or
+  your own inputs, compare them, and read the original scan beside the modern code.</p>
+<div class="program-list" data-testid="program-list">
+{% for group in groups %}
+  {% set gid = ("chapter-" ~ group.chapter) if group.chapter is not none else "chapter-unconfirmed" %}
+  <section class="chapter" data-testid="{{ gid }}" aria-labelledby="{{ gid }}-title">
+    <h2 id="{{ gid }}-title">
+      {% if group.chapter is not none %}Chapter {{ group.chapter }}{% if group.title %}: {{ group.title }}{% endif %}
+      {% else %}Book reference unconfirmed{% endif %}
+    </h2>
+    <ul class="cards">
+    {% for item in group.programs %}
+      {% set e = item.entry %}
+      <li class="card" data-testid="program-card-{{ e.id }}">
+        <h3><a href="/programs/{{ e.id }}" data-testid="program-link-{{ e.id }}">{{ e.title }}</a></h3>
+        <p class="bookref" data-testid="program-bookref-{{ e.id }}">{{ book_ref_text(e) }}
+          {% if not e.book_ref_confirmed %}<span class="badge warn" data-testid="unconfirmed-badge-{{ e.id }}">unconfirmed</span>{% endif %}
+        </p>
+        <p class="method"><strong>{{ e.method }}.</strong> {{ e.summary | trim | truncate(260, killwords=False, end="...") }}</p>
+        <p class="meta">
+          {% if item.scan %}<span class="badge ok" data-testid="scan-status-{{ e.id }}" data-scan="available">Scan available</span>
+          {% else %}<span class="badge muted" data-testid="scan-status-{{ e.id }}" data-scan="missing">No scan</span>{% endif %}
+          <span class="badge" data-testid="engines-{{ e.id }}">Engines: {{ item.engines | join(", ") if item.engines else "none yet" }}</span>
+        </p>
+      </li>
+    {% endfor %}
+    </ul>
+  </section>
+{% else %}
+  <p class="empty" data-testid="no-programs">The catalog is empty.</p>
+{% endfor %}
+</div>
+{% endblock %}

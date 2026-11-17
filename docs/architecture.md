@@ -258,7 +258,8 @@ the reference example.
 * **`[chart]`**:
   * `kind`: one of `bracket`, `abs_residual`, `romberg_heatmap`, `integrand_panels`, `factors`,
     `interpolant`.
-  * `options`: a free-form table of scalars or lists.
+  * `options`: a free-form table of scalars or lists; what each kind reads is listed under
+    "Web UI and JSON API", "Chart kinds".
 * **`[[practice]]`**:
   * `id`: slug, cited as `[id]` on the study page.
   * `prompt`.
@@ -465,6 +466,145 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
   book message), the same rows and iterations, every real within 1e-12 relative, the same book
   text, and for the data card Python's `book_text(carriage_control=True)` equal to the driver's
   stdout. In practice the two engines agree bit for bit.
+
+## Web UI and JSON API
+
+`gerald_na.web.app.create_app(settings=None, *, registry=None)` builds the FastAPI app (`gerald-na
+serve` / `make serve`). Everything is generated from the catalog: a new catalog file plus its engine
+adapter appears on the home page, gets a program page, a form, charts, tabs and practice questions
+without web-layer changes. The catalog is loaded lazily, so `/healthz` works without one.
+
+Modules: `services.py` (`WebState`: lazy registry, engine availability per program, shared request
+validation and running for HTML and API), `forms.py` (form field names and number parsing),
+`presenters.py` (iteration table, result extras, compare highlighting), `charts.py` (Plotly figure
+specs per chart kind), `practice.py` (answer checking), `pages.py`, `api.py`, `files.py`
+(routers), `markdown.py` (study pages), `middleware.py` (body limit, security headers),
+`templates/` (Jinja2, autoescaping on everywhere) and `static/` (app JS/CSS and the vendored
+HTMX 2.0.11 and Plotly.js 3.7.0 cartesian bundle with their licences, `static/vendor/README.md`;
+no CDN at runtime).
+
+### Routes
+
+| Route | Response |
+|---|---|
+| `GET /healthz` | liveness and engines |
+| `GET /` | programs grouped by confirmed chapter, then "Book reference unconfirmed" |
+| `GET /programs/{id}` | header, run form, results area, tabs, practice questions |
+| `GET /programs/{id}/form` | the run form reset to the book data card (HTMX fragment) |
+| `POST /programs/{id}/run` | results fragment (full page without the `HX-Request` header); 422 invalid input, 503 engine unavailable, 200 for every completed run including book error paths |
+| `POST /programs/{id}/practice/{question_id}` | feedback fragment; 422 when the answer cannot be read |
+| `GET /api/programs` | list: `id`, `title`, `method`, `book_ref`, `confirmed`, `book_ref_text`, `chapter`, `inputs` (catalog schema), `takes_function`, `default_preset`, `presets`, `engines` (available now, including `compare`), `scan_available`, `chart_kind`, `url`, `api_url` |
+| `GET /api/programs/{id}` | the full catalog entry; `files` holds `/files/...` URLs instead of paths (plus `fortran_executable`, `python_callable`); `engines` maps `python`/`fortran`/`compare` to `{available, reason}` |
+| `POST /api/programs/{id}/run` | see below |
+| `GET /files/{id}/{kind}[?index=N]` | DD5 whitelist: `scan` (`application/pdf`), `legacy` (`index` picks one of several), `fortran_module`, `fortran_app`, `python`, `study` (all `text/plain; charset=utf-8`), served inline with `nosniff`. Unknown program or kind, a missing file or scan, a bad index, `catalog` and any traversal attempt are 404; paths come only from `Registry.resolve_path` |
+
+Run form fields: `in_<name>` for `real`/`int`; `in_<name>` repeated per element for `real_list`
+(editable rows; add/remove buttons unless the input has a fixed `length`); `in_<name>.x` and
+`in_<name>.y` repeated per point for `point_list`; `engine` (`python`, `fortran`, `compare`),
+`function` (a preset id or `custom`) and `expression`. Numbers accept the data-card spellings
+(`0.`, `.5`, `1.E-5`, `1.D-3`); NaN and infinities are rejected. A list takes at most 100
+entries; request bodies over 64 KiB are refused with 413.
+
+### `POST /api/programs/{id}/run`
+
+Body `{"engine": "python"|"fortran"|"compare", "inputs": {...}, "preset": N, "expression": "...",
+"verbose": false}`, unknown keys rejected. Inputs left out take the book data card's value. The
+checks run in this order, and HTML and API share them (`WebState.build_request`, `WebState.run`):
+
+| HTTP | `error.code` | When |
+|---|---|---|
+| 404 | `NOT_FOUND` | unknown program (also any unknown `/api` path) |
+| 422 | `VALIDATION` | the body does not match the schema (unknown engine, wrong JSON type, unknown key, `preset < 1`); `details` lists pydantic's errors |
+| 422 | `CUSTOM_FUNCTION_ENGINE` | an `expression` with the `fortran` or `compare` engine (DD3) |
+| 422 | `INPUT` | input values invalid; `fields` maps input name to message (`_unknown` for undeclared inputs); also an unknown preset, preset plus expression, or a function for a data-only program |
+| 422 | `EXPRESSION` | the expression does not parse or is not allowed; `position` is the 1-based column |
+| 503 | `ENGINE_UNAVAILABLE` | the engine is disabled in the settings, the Fortran driver is not built, or the program has no engine adapter |
+| 200 | (none) | the run executed |
+
+Every error body is `{"error": {"code", "message", ...}}`. A 200 body is `RunOutcome.to_dict()`
+plus `mode` (the engine) and `ok`. `ok: false` means the program stopped on one of its own error
+paths, and `status` and `error.code` give the reason (`BRACKET`, `ZERO_PRODUCT`, `NON_CONVERGENT`,
+`ODD_PANELS`, `DEGREE`, `INPUT` for a non-finite F(x), `FORTRAN_RUN` for a driver timeout or crash);
+`steps` then holds the partial rows. In compare mode the body is `CompareReport.to_dict()` (with
+`outcomes`, `cells`, `columns`, `matches`, ...) plus `mode: "compare"` and `ok` (both engines
+succeeded). Non-finite floats become `null` and complex numbers become `{"re", "im"}`.
+
+### Results fragment
+
+Single engine: status (`result-value`, `result-converged`, `result-iterations`, `result-engine`) or
+`result-error` (`data-code`, `result-error-code`, `result-error-message`) with the partial rows;
+the charts; the iteration table (`results-table`, one `step-row` per step, columns and edit
+descriptors from `trace.step_columns`, the full value as tooltip); "Result details"
+(`result-extras`) made of every result dataclass field except `value`, `converged`, `iterations`
+and `steps`, rendered by shape: scalars (`extra-<field>`), number lists, ragged tables such as the
+Romberg triangle (`extra-table-<field>`), and lists of dataclasses or dicts such as Bairstow
+factors (a table with one column per key); the book text (`book-text`) and the verbose extras
+(`verbose-text`).
+
+Compare mode: `compare-summary` (`data-matches`, `compare-verdict`, `compare-iterations` with
+`data-same`, `compare-status`, `compare-max-diff`, `compare-value-diff`, `compare-note`,
+`compare-columns`), the Python charts, and the two traces side by side (`compare-python`,
+`compare-fortran`, each with `book-text-python` / `book-text-fortran`). Differing cells carry
+`class="diff-cell"` and `data-testid="diff-cell"`, with the absolute and relative difference in
+the tooltip and `data-diff`.
+
+### Chart kinds (`[chart] kind` and `options`)
+
+Builders in `gerald_na.web.charts` read only plain data: the step rows (dicts keyed by
+`step_columns`), the result dataclass's fields, the validated inputs, the chart options and, for
+programs that take a function, the compiled preset or custom function. Option defaults are in
+brackets. Each figure is a `<div data-testid="chart-<figure id>">` inside `result-chart`; the
+specs travel as JSON in `<script type="application/json" data-testid="result-chart-data">`.
+
+| Kind | Figures (ids) | Reads |
+|---|---|---|
+| `bracket` | `bracket`, plus `abs_residual` when `residual_key` is set | steps `lower_key` [x1], `upper_key` [x2], `point_key` [x] against `index_key` [k] (row number if absent); `log_residual` [true] |
+| `abs_residual` | `abs_residual` | \|steps[`residual_key` [fx]]\| against `index_key` [k]; log scale unless `log_residual = false` (exact zeros are left out on a log scale) |
+| `romberg_heatmap` | `romberg_heatmap` | result field `table_field` [table]: list of rows, as printed and possibly ragged (row i, column j, 1-based in the hover). Colour is log10 \|T - result value\|, or the value itself with `color = "value"`; each cell's text is its value |
+| `integrand_panels` | `integrand_panels` | F sampled at 400 points over [`a` (number), or input `lower_input`, or 0; input `upper_input` [b]], widened to cover the ordinates; ordinates from steps `x_key` [x], `y_key` [fx]; `weight_key` [weight] shown in the hover. Points where F fails (sin(x)/x at 0) are gaps |
+| `factors` | `factors_r`, `factors_s`, `factors_roots` | steps grouped by `group_key` [factor], with `index_key` [k], `r_key` [r], `s_key` [s]. Roots come from result `roots_field` [roots] (complex numbers, `[re, im]` or `{re, im}`), otherwise from result `factors_field` [factors]: dicts or dataclasses with `kind = quadratic` (`r`, `s`; `quadratic_form` ["x^2 - r x - s", Gerald's convention, whose sum of roots is 17.8 for the book polynomial; or "x^2 + r x + s"]), `final_quadratic` (`a2`, `a1`, `a0`) or `linear` (`a1`, `a0`). With `poly_input` (a real_list input, highest power first) the polynomial's own roots (Durand-Kerner) are added as a reference |
+| `interpolant` | `interpolant` | nodes from input `points_input` [points], only the first `count_input` [n] when that input exists; the Lagrange polynomial through them; the point (input `x_input` [xin], result `value`) |
+
+### Program page testids
+
+Navigation: `nav-brand`, `nav-home`, `nav-api`, `nav-api-docs`. Home: `program-list`, `chapter-<n>` /
+`chapter-unconfirmed`, `program-card-<id>`, `program-link-<id>`, `program-bookref-<id>`,
+`unconfirmed-badge-<id>`, `scan-status-<id>` (`data-scan` available or missing), `engines-<id>`.
+Header: `program-title`, `book-ref`, `book-ref-unconfirmed`, `program-id`, `program-summary`. Form:
+`run-form`, `input-<name>` (the input itself; for lists, the fieldset), `input-<name>-<i>` (list
+element), `input-<name>-<i>-x` / `-y` (point), `add-row-<name>`, `remove-row-<name>-<i>`,
+`field-help-<name>`, `field-bounds-<name>`, `data-card-toggle`, `data-card`, `preset-select`,
+`preset-expr`, `custom-expr`, `engine-selector`, `engine-python`, `engine-fortran`,
+`engine-compare`, `engine-note-<engine>` (why it is unavailable), `engine-custom-note`,
+`run-button`, `reset-button`, `run-indicator`. Results: `results`, `results-placeholder`,
+`results-body`, `validation-error` (`data-code`), `field-error-<name>` (also `expression`,
+`function`), `expr-error-column`, `expr-error-position`, `engine-unavailable`, plus the result
+and compare ids above. Tabs: `tab-scan`, `tab-legacy`, `tab-fortran`, `tab-python`, `tab-study`;
+panels `panel-*`; `scan-viewer` (an `<object type="application/pdf">`), `scan-download`,
+`scan-download-fallback`, `scan-missing` ("No scan available for this program"),
+`legacy-source-<i>`, `fortran-module-source`, `fortran-app-source`, `python-source` (each
+`*-missing` when the file is absent, `download-<same id>` for the raw file), `study-content`,
+`download-study`, `study-missing`. Practice: `practice-section`, `practice-empty`, `practice-<qid>`,
+`practice-prompt-<qid>`, `practice-answer-<qid>`, `practice-submit-<qid>`, `practice-feedback-<qid>`,
+and in the feedback `practice-verdict` (`data-correct` true, false or unknown),
+`practice-computed-python`, `practice-computed-fortran`, `practice-explanation`,
+`practice-invalid`.
+
+The Fortran and compare radios are disabled server-side when unavailable (with the reason) and
+client-side while the custom function is selected; the server enforces both. Practice answers
+are checked against `answer_field` of a fresh Python run of the question's inputs and preset,
+within `tolerance`; Fortran runs too when its driver is built and its answer is shown beside
+Python's.
+
+### Security
+
+Jinja2 autoescaping is on for every template, and nothing user-supplied or read from files is
+marked safe. The only `Markup` is the study page rendered by markdown-it-py with raw HTML disabled.
+Numbers are validated against the catalog before any engine runs. Bodies are capped at 64 KiB.
+Every response carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`,
+`X-Frame-Options: SAMEORIGIN` and a CSP with `script-src 'self'`: no inline scripts, and HTMX
+runs with `allowEval: false`. Because of this CSP, browser tests must use locator assertions
+rather than Playwright's string `wait_for_function`, which needs `eval`.
 
 ## Conventions
 
