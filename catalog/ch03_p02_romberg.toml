@@ -23,11 +23,12 @@ table drift low by up to 8.6e-7 compared with IEEE arithmetic, in real64 and in 
 build alike: the real32 build (make build-fortran-single, IEEE binary32, round to nearest) also
 prints 1.6181944 (value 1.6181945). The deficit comes from the arithmetic of the book's machine,
 not from the method. Arithmetic with a 27-bit binary mantissa and chopped (truncated) results --
-the single-precision format of the IBM 7090/7094 class of machines, whose FORTRAN II named its
-library functions SINF and ABSF as the listing does, and the model that reproduces the
-Simpson program's digit (ch03_p01) -- brings every table entry within 3e-7 of the book
-(1.6181938 for the last two), but not digit for digit: the machine's own SINF routine is not
-known. IEEE binary32 has a 24-bit mantissa and rounds, so its error is smaller and has no
+the single-precision format of the IBM 7090/7094 class, and the model closest to the Simpson
+program's digit (ch03_p01) -- brings every table entry within 3e-7 of the book (1.6181938 for the
+last two), but not digit for digit: the machine's own SINF routine is not known. An 8-digit
+decimal chopped model (IBM 1620 class) is further off (1.6181909). The book's computer is not
+identified; the chapter 1 printouts point to a decimal machine (docs/architecture.md, "The book's
+computer"). IEEE binary32 has a 24-bit mantissa and rounds, so its error is smaller and has no
 systematic bias. The golden tests therefore compare both builds with the book within 1e-6, and
 real64 tightly with its own values.
 
@@ -197,7 +198,9 @@ study_page = "content/ch03_p02.md"
 
 [chart]
 kind = "romberg_heatmap"
-options = { table_field = "table", row_label = "Line L (10*2**(L-1) subintervals)", column_label = "Extrapolation order", color = "log10_error_vs_best", step_diff_key = "diff", tolerance_input = "tol" }
+# The printed triangle (line L = TRAP(1..L, L)) coloured by log10 |T - result|.
+# Option names: docs/architecture.md, "Chart kinds".
+options = { table_field = "table", row_label = "Line L (10*2**(L-1) subintervals)", column_label = "Extrapolation order", color = "error" }
 
 # ------------------------------------------------------------------ practice questions
 # Reference answers computed with the engines in real64 (Python and Fortran agree bit for bit).
@@ -216,7 +219,7 @@ prompt = "What value does the program report for Si(15)? Give it to 7 decimals."
 answer_field = "value"
 answer = 1.6181944440409433
 tolerance = 5.0e-7
-explanation = "Real64 gives 1.6181944, the true Si(15) to 7 decimals. The book printed 1.6181936 because its 1970s machine chopped every result to 27 bits; the method is not to blame."
+explanation = "Real64 gives 1.6181944, the true Si(15) to 7 decimals. The book printed 1.6181936 because its 1970s machine chopped every result (the closest model is a 27-bit binary mantissa); the method is not to blame."
 
 [[practice]]
 id = "si-one"
@@ -334,7 +337,7 @@ id = "machine-digits"
 kind = "original_quirk"
 original = "1.6181936 (book), every table entry 1e-7 to 8.6e-7 low"
 corrected = "1.6181944 (real64 = Si(15)), real32 1.6181945"
-note = "The book's machine chopped its results to a 27-bit mantissa; IEEE arithmetic rounds. Computed values are printed chopped without a leading zero like the book's printer; the input echoes B and TOL are rounded to nearest (they were exact on the card). The golden tests compare numbers within 1e-6."
+note = "The book's machine chopped its results (closest model: a 27-bit binary mantissa; the machine itself is not identified, see docs/architecture.md); IEEE arithmetic rounds. Computed values are printed chopped without a leading zero like the book's printer; the input echoes B and TOL are rounded to nearest (they were exact on the card). The golden tests compare numbers within 1e-6."
 
 [[errata]]
 id = "non-convergence-result"

@@ -147,8 +147,8 @@ contains
          message="value must be the book's 1.5499307 within 1E-6")
       if (allocated(error)) return
       if (single_precision) then
-         ! IEEE binary32 with the book's order of summation; the book's machine (a binary
-         ! mantissa of about 27 bits with chopped arithmetic) printed 1.5499307.
+         ! IEEE binary32 with the book's order of summation; the book's machine (not
+         ! identified; closest model: 27-bit binary mantissa, chopped) printed 1.5499307.
          call check(error, res%value, 1.54993140697479248_wp, thr=0.0_wp, &
             message="real32 value with the book's order of summation")
       else

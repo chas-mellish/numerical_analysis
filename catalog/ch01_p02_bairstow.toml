@@ -31,8 +31,10 @@ leading zero. real64 then reproduces 4.19999 -2.09999 / 3.30000 -6.20000 / 1.000
 3.29999, because the book's R ended just below 3.3); real32 prints 4.20000 -2.10000 / 3.29999 -6.19999 /
 1.00000 -10.29999. The last digit depends on which side of the exact value the arithmetic lands, so the
 golden tests compare numbers within 2e-5, not text. The echoed polynomial is printed rounded to nearest:
-the book's decimal machine held 99.41 exactly, while binary 99.41 is 99.409999... and would chop to
-99.40999.
+the book shows 99.41000, -17.80000 and -261.21800, exact as on a decimal machine, while binary 99.41 is
+99.409999... and would chop to 99.40999. This is one of the hints that chapter 1 ran on a decimal
+machine (IBM 1620 class); the chapter 3 sums fit 27-bit chopped binary better, and the book's computer
+is not identified (docs/architecture.md, "The book's computer").
 """
 book_output = """
 THE ORIGINAL POLYNOMIAL-
@@ -206,8 +208,10 @@ study_page = "content/ch01_p02.md"
 [chart]
 kind = "factors"
 # Convergence of R and S per factor (one trace per factor from the STEP rows), the correction size
-# |DELR| + |DELS| on a log axis, and the polynomial with the roots of the true factors marked.
-options = { factor_key = "factor", step_key = "k", r_key = "r", s_key = "s", delta_keys = ["delr", "dels"], log_delta = true, show_polynomial = true, show_roots = true, factor_sign_convention = "x**2 - r x - s" }
+# |DELR| + |DELS| on a log axis, the roots of the true factors X**2 - R X - S on the complex plane
+# (with the polynomial's own roots as a reference), and the polynomial with its real roots marked.
+# Option names: docs/architecture.md, "Chart kinds".
+options = { group_key = "factor", index_key = "k", r_key = "r", s_key = "s", delta_keys = ["delr", "dels"], log_delta = true, factors_field = "factors", quadratic_form = "x^2 - r x - s", poly_input = "a", show_polynomial = true }
 
 # ------------------------------------------------------------------ practice questions
 # Reference answers computed with the book algorithm in real64 (identical in real32 unless noted).

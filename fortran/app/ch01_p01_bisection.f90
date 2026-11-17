@@ -163,10 +163,15 @@
 !     higher, e.g. .4435730.)
 !   * One last-digit difference remains in the F(X) column of each build. It is
 !     documented, not patched: F(X) = EXP(-X) - SIN(...) cancels to about 1E-6
-!     near the root, so its sixth decimal depends on the arithmetic. The
-!     deck-control cards (ZZJOB, ZZFORX) appear to be those of an IBM 1620
-!     monitor, whose FORTRAN used 8-digit decimal floating point with chopped
-!     results; its midpoints were chopped decimals, not the exact binary ones.
+!     near the root, so its sixth decimal depends on the arithmetic.
+!     The book's computer is not identified (docs/architecture.md, "The
+!     book's computer"). The deck-control cards (ZZJOB, ZZFORX) look like
+!     IBM 1620 Monitor cards (8-digit decimal floating point, chopped), and
+!     the Bairstow echo (ch01_p02) also suggests a decimal machine, while the
+!     chapter 3 sums (ch03_p01, ch03_p02) fit 27-bit chopped binary (IBM 7090
+!     class) better. This program does not discriminate: both an 8-digit
+!     decimal and a 27-bit binary chopped emulation reproduce the two book
+!     digits below, which each IEEE build misses.
 !       row 15, real64:  F(.443572998...) =  9.989E-7 -> .000000  (book .000001)
 !       row 11, real32:  F(.443847656...) = -5.0598E-4 -> -.000505 (book -.000506)
 !     All other F(X) entries agree with the book in both builds, and every

@@ -25,6 +25,20 @@ zero: row 8 prints .4414062 for X = 0.44140625 and the root prints .4435729 for 
 A modern compiler rounds and prints 0.4414063 and 0.4435730, so the golden tests compare X within
 1e-7 and F(X) within 1e-6 instead of comparing text. The constant 3.1415926 is the book's
 truncated pi and is kept on purpose: it is part of the book's F(X).
+
+Non-finite function values have no counterpart on the original machine. When F(X1), F(X2) or a
+midpoint's F(X) is NaN or infinite (EXP(-X) overflows for X < -709 in real64 and X < -88 in real32,
+or a learner function fails), both engines stop with an INPUT error (trace ERROR,code=INPUT, exit
+status 2) and keep the rows computed so far. A successful run reports, besides the root, the
+RESULT extras root_at_endpoint, fx1 and fx2 (F at the data card's X1 and X2).
+
+The book's computer is not identified (docs/architecture.md, "The book's computer"). The ZZJOB and
+ZZFORX deck-control cards on this page look like IBM 1620 Monitor cards (8-digit decimal floating
+point with chopped results), and Bairstow's coefficient echo (ch01_p02) also suggests a decimal
+machine; the chapter 3 sums (ch03_p01, ch03_p02) are better explained by 27-bit chopped binary
+arithmetic (IBM 7090 class). This program cannot decide it: the F(X) digits that real64 (row 15,
+.000000) and real32 (row 11, -.000506 vs -.000505) each miss by one unit are reproduced by both an
+8-digit decimal and a 27-bit binary chopped emulation.
 """
 book_output = """
 AT X =   .5000000 F(X) =   -.100576

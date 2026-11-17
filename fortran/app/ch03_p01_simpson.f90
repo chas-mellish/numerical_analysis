@@ -150,10 +150,12 @@
 !     machine, not a bug.
 !   * The real32 build (-DSINGLE, IEEE binary32, round to nearest) prints
 !     1.5499314 (1.54993140697479248), NOT the book's 1.5499307. Arithmetic
-!     with a 27-bit binary mantissa and chopped results (the IBM 7090/7094
-!     single-precision format, whose FORTRAN II named its functions SINF,
-!     EXPF, ...) gives 1.549930662 and reproduces the book's 1.5499307. The
-!     order of summation matters in real32: summing the ordinates in k order
+!     with a 27-bit binary mantissa and chopped results (IBM 7090/7094 single
+!     precision) comes closest: 1.549930662, the book's 1.5499307 when
+!     rounded (1.5499306 when chopped); 8-digit decimal chopped (IBM 1620
+!     class) gives 1.5499262. The book's computer is not identified (its SIN
+!     routine is unknown; see docs/architecture.md, "The book's computer").
+!     The order of summation matters in real32: summing the ordinates in k order
 !     gives 1.5499310 instead of 1.5499314, so the scan's order is kept
 !     exactly. Golden tests compare the SINGLE build with the book value
 !     within 1E-6 (fortran/test/test_simpson.f90 pins the exact real32 value).

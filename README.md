@@ -38,6 +38,20 @@ Dockerfile, .devcontainer/  reference environment
 
 `catalog/`, `content/`, `fortran/app/` and the algorithm modules are filled in program by program.
 
+## Programs
+
+| Id | Method | Book reference | Fortran driver | Web page |
+|---|---|---|---|---|
+| `ch01_p01` | Interval halving (bisection) | Chapter 1, Program 1, page 24 | `ch01_p01_bisection` | `/programs/ch01_p01` |
+| `ch01_p02` | Bairstow's method (quadratic factors) | Chapter 1, Program 2, page 25 | `ch01_p02_bairstow` | `/programs/ch01_p02` |
+| `ch03_p01` | Simpson's 1/3 rule, Si(B) | Chapter 3, Program 1, page 73 | `ch03_p01_simpson` | `/programs/ch03_p01` |
+| `ch03_p02` | Romberg integration, Si(B) | Chapter 3, Program 2, page 74 | `ch03_p02_romberg` | `/programs/ch03_p02` |
+| `lagrange_interpolation` | Lagrange interpolation | unconfirmed (no scan) | `lagrange_interpolation` | `/programs/lagrange_interpolation` |
+
+Each runs on the Python engine, the Fortran engine and in compare mode
+(`uv run gerald-na run <id> --engine python|fortran|compare`). The computer that produced the
+book's printouts is not identified; see `docs/architecture.md`, "The book's computer".
+
 ## Quick start
 
 Requirements: gfortran 16 (or LLVM flang), fpm 0.13, GNU make and

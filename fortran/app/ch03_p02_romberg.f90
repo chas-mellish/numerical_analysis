@@ -155,11 +155,12 @@
 !     reversion prints the 9th on a line of its own, as the original did.
 !   * Printed digits: the book's table drifts low against IEEE arithmetic by
 !     up to 8.6E-7 in line 4 (book 1.6181936; real64 1.6181944 = Si(15);
-!     real32 1.6181945). The book's machine chopped its results to a 27-bit
-!     binary mantissa (IBM 7090/7094 class, whose FORTRAN II named SINF and
-!     ABSF; the same model reproduces ch03_p01's digit): emulating that brings
+!     real32 1.6181945). Emulating 27-bit chopped binary arithmetic (IBM
+!     7090/7094 single precision, also the closest model for ch03_p01) brings
 !     every entry within 3E-7 of the book (1.6181938), not digit for digit,
-!     since the machine's SINF is unknown. Computed values are printed like the
+!     since the machine's SINF is unknown; 8-digit decimal chopped (IBM 1620
+!     class) gives 1.6181909. The book's computer is not identified
+!     (docs/architecture.md, "The book's computer"). Computed values are printed like the
 !     book's printer did, chopped (RZ) and without a leading zero
 !     (book_format_mod: book_fixed). The two input echoes, B (F6.2) and TOL
 !     (E14.7), are rounded to nearest instead: they were exact card values in
@@ -204,8 +205,8 @@
 !   9 e-format-digits (original_quirk): E14.7 printed as ES14.7. See B.
 !  10 table-row-alignment (original_quirk): FORMAT 203 followed; the scan
 !     shows the table one column to the left. See B.
-!  11 machine-digits (original_quirk): 27-bit chopped arithmetic of the book's
-!     machine; RZ without leading zero for computed values, inputs rounded.
+!  11 machine-digits (original_quirk): chopped arithmetic of the book's
+!     machine (closest model 27-bit binary; machine not identified); RZ without leading zero for computed values, inputs rounded.
 !     See B.
 !  12 non-convergence-result (modernization): the 9x9 table and FORMAT 201 are
 !     a RESULT with converged=F, exit status 0. See C.

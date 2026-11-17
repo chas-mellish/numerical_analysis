@@ -157,10 +157,11 @@ study_page = "content/lagrange_interpolation.md"
 
 [chart]
 # Data points (nodes), the interpolating polynomial curve, and the evaluated point (XIN, value).
-# The curve is sampled with gerald_na.algorithms.lagrange.lagrange_curve over the span of the
-# nodes widened to include XIN (extrapolation is visible).
+# The curve is sampled over the span of the nodes widened to include XIN (extrapolation is
+# visible); gerald_na.algorithms.lagrange.lagrange_curve computes the same polynomial.
+# Option names: docs/architecture.md, "Chart kinds".
 kind = "interpolant"
-options = { nodes_input = "points", point_input = "xin", value_field = "value", curve = "gerald_na.algorithms.lagrange:lagrange_curve", samples = 101, include_point_in_range = true, x_label = "X", y_label = "Y" }
+options = { points_input = "points", count_input = "n", x_input = "xin", samples = 101, x_label = "X", y_label = "Y" }
 
 # ------------------------------------------------------------------ practice questions
 # Reference answers computed with the engines (real64; identical on Python and Fortran).

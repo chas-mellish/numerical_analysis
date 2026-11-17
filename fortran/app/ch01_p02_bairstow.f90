@@ -170,10 +170,12 @@
 !     (IF (KOUNT - LIM) after the first correction).
 !   * The book's machine chopped printed digits (4.19999, -2.09999, 3.29999)
 !     and printed no leading zero. The factor lines use the RZ edit mode and
-!     drop the leading zero (book_fixed). The echoed coefficients, which the
-!     book's decimal machine held exactly, are printed rounded to nearest
-!     (99.41 is 99.409999... in binary and would chop to 99.40999), also
-!     without a leading zero.
+!     drop the leading zero (book_fixed). The echoed coefficients are printed
+!     rounded to nearest, also without a leading zero: the book shows 99.41000,
+!     -17.80000 and -261.21800, exact as on a decimal machine, whereas binary
+!     99.41 is 99.409999... and would chop to 99.40999. This echo is one of
+!     the hints that chapter 1 ran on a decimal machine; the book's computer
+!     is not identified (docs/architecture.md, "The book's computer").
 ! D. Drift of the earlier rewrite (legacy_code/fortran/chapter_2/bairstow.f90),
 !    restored to the scan:
 !   * It read the degree first, with prompts; the cards are read again in the

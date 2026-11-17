@@ -26,11 +26,14 @@ A modern real32 build (make build-fortran-single, IEEE binary32 with round-to-ne
 1.5499314 (value 1.54993140697479248), not the book's digits. With the book's order of summation
 the real32 result is the same in every rounding experiment; summing in k order instead gives
 1.5499310. So the order of summation does change the real32 digits, and the code keeps the scan's
-order exactly. The book's digit is reproduced by arithmetic with a 27-bit binary mantissa and
-chopped (truncated) results: that gives 1.549930662, which prints 1.5499307. This is the
-single-precision format of the IBM 7090/7094 class of machines, whose FORTRAN II named its
-library functions SINF, EXPF and so on, as the listing does. IEEE binary32 has a 24-bit mantissa
-and rounds, so its error is smaller and has no systematic bias. For the same reason the golden
+order exactly. Arithmetic with a 27-bit binary mantissa and chopped (truncated) results, the
+single-precision format of the IBM 7090/7094 class, comes closest: it gives 1.549930662, which is
+the book's 1.5499307 rounded to 7 decimals (1.5499306 if chopped like the other printed values).
+An 8-digit decimal chopped model (IBM 1620 class) gives 1.5499262, much further off. The book's
+computer is still not identified -- the machine's SIN routine is unknown, the SINF naming is
+FORTRAN II on both families, and the chapter 1 printouts point to a decimal machine (see
+docs/architecture.md, "The book's computer"). IEEE binary32 has a 24-bit mantissa and rounds, so
+its error is smaller and has no systematic bias. For the same reason the golden
 tests compare the SINGLE build with the book value within 1e-6, not digit for digit.
 
 The abscissa X is accumulated (X = X + 2.*DELX), not recomputed as K*DELX. In real32 it drifts by
@@ -157,7 +160,9 @@ study_page = "content/ch03_p01.md"
 
 [chart]
 kind = "integrand_panels"
-options = { x_key = "x", y_key = "fx", weight_key = "weight", lower = 0.0, upper_input = "b", panels_input = "n" }
+# F sampled over [0, B] (F(0) = 1, the book's seed, for SIN(X)/X) with the N + 1 ordinates and
+# their Simpson weights. Option names: docs/architecture.md, "Chart kinds".
+options = { x_key = "x", y_key = "fx", weight_key = "weight", a = 0.0, upper_input = "b" }
 
 # ------------------------------------------------------------------ practice questions
 # Reference answers computed with the engines (real64).

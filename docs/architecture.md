@@ -314,6 +314,35 @@ the reference example.
   prints the index. The test `python/tests/unit/test_catalog_integrity.py` requires an empty
   list.
 
+### The book's computer (not identified)
+
+The scans do not name the computer the listings ran on, and the evidence points two ways, so
+every catalog entry, study page and driver header treats the identification as open:
+
+* **Deck-control cards (ch01_p01).** The bisection page shows `ZZJOB` and `ZZFORX` cards, which
+  look like IBM 1620 Monitor control cards. The 1620 (FORTRAN II-D) used decimal floating point,
+  8 digits by default, with chopped results.
+* **Coefficient echo (ch01_p02).** Bairstow prints 99.41000, -17.80000 and -261.21800. A decimal
+  machine holds these exactly. A binary machine whose output conversion chops (the X column of
+  ch01_p01 shows that the printer chopped) would print 99.40999, -17.79999 and -261.21799.
+* **Accumulated sums (ch03_p01, ch03_p02).** Emulating 27-bit binary chopped arithmetic (the
+  single precision of the IBM 704/709/7090/7094) gives Si(5) = 1.54993066 for Simpson (book
+  1.5499307: that is the value rounded; chopped it prints 1.5499306) and a last Romberg line
+  within 3e-7 of the book (1.6181938 against 1.6181936). An 8-digit decimal chopped emulation is
+  further off: 1.5499262 and 1.6181909 (9 digits: 1.5499308 and 1.6181941). The machine's SIN
+  routine is unknown (the emulations chop a correctly rounded sine), so these are indications,
+  not proof.
+* **Not discriminating.** Bisection's printed digits, including the F(X) entries `.000001`
+  (row 15) and `-.000506` (row 11) that the real64 and real32 builds each miss by one unit, are
+  reproduced by both the 8-digit decimal and the 27-bit binary model. The names SINF, EXPF and
+  ABSF are the FORTRAN II convention on the 1620 and on the 7090 family alike.
+
+A plausible reading is that the listings did not all run on the same machine: chapter 1 on a
+decimal one (IBM 1620 class) and chapter 3 on a 27-bit binary one (IBM 7090 class). Neither is
+confirmed. Nothing in the modern code depends on the answer: the engines compute in IEEE real64
+(real32 with `SINGLE`), the book text imitates the printer (chopped digits, no leading zero), and
+the golden tests compare numbers within the DD4 tolerances.
+
 ## Engines
 
 `gerald_na.engines` runs a catalog program on either engine and returns the same result
@@ -441,10 +470,16 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
      steps from `self.steps_from_trace(entry, trace)` and other records (for example
      `trace.of_type("TABLE")` for the Romberg table, `trace.of_type("FACTOR")` for Bairstow), and
      raise `FortranRunError` on inconsistent records;
-   * optionally override `check_inputs(entry, inputs)` for constraints between inputs that the
-     per-input bounds cannot express; both engines call it after request validation and before
-     anything runs, so a violation raises `InputError` on either engine (Lagrange: `n` must
-     equal the number of points);
+   * optionally override `input_problems(entry, inputs) -> {input name: message}` for
+     constraints between inputs that the per-input bounds cannot express (Lagrange: `n` must
+     equal the number of points). Both engines call `check_inputs` (which raises `InputError`
+     with those messages) after request validation and before anything runs; the web layer
+     reports them per field (422 `INPUT` with `fields`);
+   * optionally override `substituted_ordinates(entry, function) -> {x: value}` when the program
+     uses a fixed value instead of F(x) somewhere (Simpson and Romberg: F(0) = 1 for the book's
+     SIN(X)/X); the charts draw F the same way. Shared input accessors (`real_input`,
+     `int_input`) and the book-function test (`is_book_function`, `book_seed_for`) are in
+     `gerald_na.engines.adapters._common`;
    * optionally override `data_card(entry, inputs)` when the driver's `READ` statements need a
      layout other than the generic one (one line per catalog `card`, numbers with `repr`
      precision, every `point_list` pair on its own line), `steps_from_trace` when the `STEP`
@@ -457,12 +492,26 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
 
 ### Program-specific notes
 
+* **ch01_p02 (Bairstow).** Data-only program (`takes_function = false`): the driver rejects `--preset`. Card 1 is the
+  `real_list` input `a` (seven coefficients, X**6 first), card 2 is `r1 s1 test lim n`; the generic
+  `serialize_card` writes one line per card.
+* Trace: `STEP` rows carry `factor` and `k` (KOUNT restarts at 1 per factor and after a
+  zero-denominator nudge); a `FACTOR` record follows the last `STEP` of each factor; `RESULT`
+  `value` is the number of factors (an integer) with the extra `nudges`. Errors: `NON_CONVERGENT`
+  (book FORMAT 24) and `DEGREE` (N outside 2..6 or a nonzero coefficient above X**N).
+* `--verbose` text (true factors X**2 - R X - S and roots) is identical on both engines
+  (`BairstowResult.verbose_text`), checked by `python/tests/parity/test_bairstow_parity.py`.
+  Its parity input generator (`CUSTOM_GENERATORS["ch01_p02"]`) draws the coefficients with N.
+* Book text: factor lines use RZ (the book's chopped digits); the echoed coefficients use RN,
+  because binary 99.41 would chop to 99.40999.
 * **ch03_p01 (Simpson), the X = 0 seed.** The listing starts its sum with the literal `1.0`, the
   limit of SIN(X)/X at 0. The catalog expression `SIN(X)/X` divides by zero there on the Python
   engine, while the Fortran preset `f_sinc` returns 1. Both algorithms therefore take the first
   ordinate as an optional `f0` argument (default: evaluate `f(0)`). The adapter passes the
   book's `1.0` only when the function normalizes to the book's integrand (preset 1, or a learner's
-  `SINF(X)/X`). Any other function supplies its own F(0); a learner function undefined at 0 is an
+  `SINF(X)/X`); the test is the shared `book_seed_for` of `gerald_na.engines.adapters._common`,
+  and both adapters derive from its `BookSeededIntegrandAdapter`, which also reports the seed as
+  `substituted_ordinates` so the `integrand_panels` chart draws F(0) = 1 instead of a gap. Any other function supplies its own F(0); a learner function undefined at 0 is an
   `EXPRESSION` error. The `ODD_PANELS` trace message writes the comma of the book message as `;`.
 * **ch03_p02 (Romberg), table and seed.** The `TABLE,row=..,col=..,value=..` records carry every
   computed `TRAP(row, col)` (row = extrapolation order, col = halving index + 1) in the book's
@@ -471,18 +520,16 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
   one record per halving (`k` = 1..8), so `iterations` is the number of halvings and the table
   has `iterations + 1` lines. Not meeting TOL after 8 extrapolations is a `RESULT` with
   `converged=F` (exit status 0), as the book prints the table and a note. The seed
-  `SUM = 1. + FCN(B)` follows the Simpson convention: optional `f0` (default `f(0)`), with the
-  book's `1.0` passed by the adapter when the function normalizes to `SIN(X)/X`.
-### Program notes: `lagrange_interpolation`
-
-* No scan exists; the listing was transcribed from the OCR text only, and the corrections are
+  `SUM = 1. + FCN(B)` follows the Simpson convention through the same shared base class.
+* **lagrange_interpolation.** No scan exists; the listing was transcribed from the OCR text only, and the corrections are
   justified by syntax, the FORMAT Hollerith counts and the printed 2.3119 (see the catalog
   errata). The pairs are X(I), Y(I) in READ order (verified numerically).
 * The driver reads the whole of stdin and parses it list-directed, so N is checked against
   `DIMENSION X(10), Y(10)` (`DEGREE`) before the pairs are read and any card layout works.
   Equal X values (a division by zero in the original) are an `INPUT` error on both engines.
-* The adapter writes the book's card layout (`05`, one pair per line, XIN) and checks
-  `n == len(points)`; the parity generator `lagrange_inputs` draws consistent, well-spaced data.
+* The adapter writes the book's card layout (`05`, one pair per line, XIN) and reports
+  `n != len(points)` from `input_problems` (keyed by `n`: the web form marks that field and the
+  API lists it in `fields`); the parity generator `lagrange_inputs` draws consistent, well-spaced data.
 * `gerald_na.algorithms.lagrange.lagrange_curve` samples the interpolant for the `interpolant`
   chart (nodes, curve, and the evaluated point).
 
@@ -501,21 +548,6 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
   book message), the same rows and iterations, every real within 1e-12 relative, the same book
   text, and for the data card Python's `book_text(carriage_control=True)` equal to the driver's
   stdout. In practice the two engines agree bit for bit.
-
-### Program notes: ch01_p02 (Bairstow)
-
-* Data-only program (`takes_function = false`): the driver rejects `--preset`. Card 1 is the
-  `real_list` input `a` (seven coefficients, X**6 first), card 2 is `r1 s1 test lim n`; the generic
-  `serialize_card` writes one line per card.
-* Trace: `STEP` rows carry `factor` and `k` (KOUNT restarts at 1 per factor and after a
-  zero-denominator nudge); a `FACTOR` record follows the last `STEP` of each factor; `RESULT`
-  `value` is the number of factors (an integer) with the extra `nudges`. Errors: `NON_CONVERGENT`
-  (book FORMAT 24) and `DEGREE` (N outside 2..6 or a nonzero coefficient above X**N).
-* `--verbose` text (true factors X**2 - R X - S and roots) is identical on both engines
-  (`BairstowResult.verbose_text`), checked by `python/tests/parity/test_bairstow_parity.py`.
-  Its parity input generator (`CUSTOM_GENERATORS["ch01_p02"]`) draws the coefficients with N.
-* Book text: factor lines use RZ (the book's chopped digits); the echoed coefficients use RN,
-  because binary 99.41 would chop to 99.40999.
 
 ## Web UI and JSON API
 
@@ -553,7 +585,11 @@ Run form fields: `in_<name>` for `real`/`int`; `in_<name>` repeated per element 
 `in_<name>.y` repeated per point for `point_list`; `engine` (`python`, `fortran`, `compare`),
 `function` (a preset id or `custom`) and `expression`. Numbers accept the data-card spellings
 (`0.`, `.5`, `1.E-5`, `1.D-3`); NaN and infinities are rejected. A list takes at most 100
-entries; request bodies over 64 KiB are refused with 413.
+entries; request bodies over 64 KiB are refused with 413. A list with a fixed `length` (Bairstow's
+seven coefficients) has no add/remove buttons and any other count is a field error. Constraints
+between inputs come from the adapter's `input_problems`: for Lagrange, `n` must equal the number
+of point rows, so after adding or removing a point the learner updates N, otherwise the form
+answers 422 with the message on the `n` field (`field-error-n`).
 
 ### `POST /api/programs/{id}/run`
 
@@ -566,7 +602,7 @@ checks run in this order, and HTML and API share them (`WebState.build_request`,
 | 404 | `NOT_FOUND` | unknown program (also any unknown `/api` path) |
 | 422 | `VALIDATION` | the body does not match the schema (unknown engine, wrong JSON type, unknown key, `preset < 1`); `details` lists pydantic's errors |
 | 422 | `CUSTOM_FUNCTION_ENGINE` | an `expression` with the `fortran` or `compare` engine (DD3) |
-| 422 | `INPUT` | input values invalid; `fields` maps input name to message (`_unknown` for undeclared inputs); also an unknown preset, preset plus expression, or a function for a data-only program |
+| 422 | `INPUT` | input values invalid; `fields` maps input name to message (`_unknown` for undeclared inputs; cross-input rules such as Lagrange's `n` against its points are reported on the input named by the adapter); also an unknown preset, preset plus expression, or a function for a data-only program |
 | 422 | `EXPRESSION` | the expression does not parse or is not allowed; `position` is the 1-based column |
 | 503 | `ENGINE_UNAVAILABLE` | the engine is disabled in the settings, the Fortran driver is not built, or the program has no engine adapter |
 | 200 | (none) | the run executed |
@@ -610,10 +646,10 @@ specs travel as JSON in `<script type="application/json" data-testid="result-cha
 |---|---|---|
 | `bracket` | `bracket`, plus `abs_residual` when `residual_key` is set | steps `lower_key` [x1], `upper_key` [x2], `point_key` [x] against `index_key` [k] (row number if absent); `log_residual` [true] |
 | `abs_residual` | `abs_residual` | \|steps[`residual_key` [fx]]\| against `index_key` [k]; log scale unless `log_residual = false` (exact zeros are left out on a log scale) |
-| `romberg_heatmap` | `romberg_heatmap` | result field `table_field` [table]: list of rows, as printed and possibly ragged (row i, column j, 1-based in the hover). Colour is log10 \|T - result value\|, or the value itself with `color = "value"`; each cell's text is its value |
-| `integrand_panels` | `integrand_panels` | F sampled at 400 points over [`a` (number), or input `lower_input`, or 0; input `upper_input` [b]], widened to cover the ordinates; ordinates from steps `x_key` [x], `y_key` [fx]; `weight_key` [weight] shown in the hover. Points where F fails (sin(x)/x at 0) are gaps |
-| `factors` | `factors_r`, `factors_s`, `factors_roots` | steps grouped by `group_key` [factor], with `index_key` [k], `r_key` [r], `s_key` [s]. Roots come from result `roots_field` [roots] (complex numbers, `[re, im]` or `{re, im}`), otherwise from result `factors_field` [factors]: dicts or dataclasses with `kind = quadratic` (`r`, `s`; `quadratic_form` ["x^2 - r x - s", Gerald's convention, whose sum of roots is 17.8 for the book polynomial; or "x^2 + r x + s"]), `final_quadratic` (`a2`, `a1`, `a0`) or `linear` (`a1`, `a0`). With `poly_input` (a real_list input, highest power first) the polynomial's own roots (Durand-Kerner) are added as a reference |
-| `interpolant` | `interpolant` | nodes from input `points_input` [points], only the first `count_input` [n] when that input exists; the Lagrange polynomial through them; the point (input `x_input` [xin], result `value`) |
+| `romberg_heatmap` | `romberg_heatmap` | result field `table_field` [table]: list of rows, as printed and possibly ragged (row i, column j, 1-based in the hover; axis titles `row_label` ["row i"] and `column_label` ["column j"]). Colour is log10 \|T - result value\| (`color = "error"`, the default), or the value itself with `color = "value"`; each cell's text is its value |
+| `integrand_panels` | `integrand_panels` | F sampled at 400 points over [`a` (number), or input `lower_input`, or 0; input `upper_input` [b]], widened to cover the ordinates; ordinates from steps `x_key` [x], `y_key` [fx]; `weight_key` [weight] shown in the hover. F is evaluated the way the program does: the adapter's `substituted_ordinates` (Simpson/Romberg: F(0) = 1 for the book's SIN(X)/X) replace the expression there; other points where F fails (a learner's 1/x at 0) are gaps |
+| `factors` | `factors_r`, `factors_s`, `factors_roots`, plus `factors_delta` with `delta_keys` and `factors_polynomial` with `show_polynomial` | steps grouped by `group_key` [factor], with `index_key` [k], `r_key` [r], `s_key` [s]. Roots come from result `roots_field` [roots] (complex numbers, `[re, im]` or `{re, im}`), otherwise from result `factors_field` [factors]: dicts or dataclasses with `kind = quadratic` (`r`, `s`; `quadratic_form` ["x^2 - r x - s", Gerald's convention, whose sum of roots is 17.8 for the book polynomial; or "x^2 + r x + s"]), `final_quadratic` (`a2`, `a1`, `a0`) or `linear` (`a1`, `a0`), the coefficients either as named keys or as one `coefficients` list in that order (`BairstowFactor`). With `poly_input` (a real_list input, highest power first) the polynomial's own roots (Durand-Kerner) are added as a reference, and `show_polynomial = true` draws P(x) with the real roots marked. `delta_keys` (e.g. `["delr", "dels"]`) plots the sum of their absolute values per iteration and factor (log scale unless `log_delta = false`) |
+| `interpolant` | `interpolant` | nodes from input `points_input` [points], only the first `count_input` [n] when that input exists; the Lagrange polynomial through them (`samples` [400] points); the point (input `x_input` [xin], result `value`); axis titles `x_label` [x], `y_label` [y] |
 
 ### Program page testids
 
