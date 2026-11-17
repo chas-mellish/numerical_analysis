@@ -21,7 +21,7 @@ precision_notes = """
 At X = 0 the book function gives exactly DX = H*SINH(H) (about H**2) and DDX = 2*COSH(H)
 (about 2 + H**2), so the truncation error of both formulas falls by a factor of 100 per row.
 F(X) = 0 at X = 0, so the second difference FR - 2*FO + FL has no cancellation: DDX stays within
-one or two units of the eighth digit of 2 in every precision, and the book's oscillation
+a few units of the eighth digit of 2 in every precision, and the book's oscillation
 (2.0000999, 2.0000009, 1.9999999 for H = 1E-5..1E-7, then 2.0000000) is round-off of its machine.
 The first difference FR - FL is a cancellation: its relative size is about 2H, so it loses all
 of its digits once 2H drops below the machine's precision. The book prints DX = 1.0000150E-04
@@ -35,7 +35,13 @@ Real64 keeps about 16 digits, so every real64 row stays close to H*SINH(H): row 
 1.0000166E-04 (0.00010000166667499881), the last row 1.0000000E-20 (value
 1.0000000031710762e-20). A real32 build (IEEE binary32, about 7 digits) behaves like the book:
 EXP(H) rounds to 1 for H below 6E-8, so DX is exactly 0 for the last three rows. DDX in real64 is
-2.0001000 at H = 1E-2 and exactly 2.0 from H = 1E-8 on.
+2.0001000 at H = 1E-2 and exactly 2.0 from H = 1E-8 on. The SINGLE driver (gfortran -DSINGLE,
+checked against the build; the real32 tolerances were first set from a float32 emulation) prints
+DX = 1.0016676E-02, 1.0000184E-04, 1.0000462E-06, 1.0000888E-08, 9.9920065E-11, 9.7578184E-13,
+8.4703277E-15, then 0.0000000E-99 three times, and DDX = 2.0100085, 2.0000998, 2.0000009, then
+2.0000000; its H is the binary32 accumulation (row 1: 0.100000001). Its largest deviations from
+the book are 1.5E-9 in H, 2.0E-9 in DX and 2.7E-7 in DDX (row 1, a few units of real32's last
+digit), all inside the real32 tolerances below.
 
 The golden tests therefore compare per column in absolute terms: H within 1E-12 (real32 1E-8),
 DX within 2E-9 (real32 1E-8; the book's largest DX deviation is 1.7E-9 at H = 1E-2, a cancellation

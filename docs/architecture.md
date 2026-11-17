@@ -152,6 +152,11 @@ before it.
   3 `cos(x) - x`.
 * Simpson and Romberg presets: 1 `sin(x)/x` with the limit 1 at x = 0 (the book's),
   2 `exp(-x**2)`, 3 `1/(1+x**2)`.
+* Central-difference presets (ch04_p01): 1 `x**2*exp(x)` (the book's), 2 `sin(x)`,
+  3 `1 + log10(x)` (the p. 91 problem 2 table).
+* Preset ids are scoped per program family: `functions_mod` has one `get_<family>_preset`
+  routine and `<family>_preset_count` per family (`bisection`, `quadrature`, `derivative`), and a
+  driver calls only its own family's routine, so every family numbers its presets from 1.
 * Bairstow and Lagrange take data, not functions, and have no presets.
 * When the learner enters a custom expression instead of a preset, the UI disables the Fortran and
   compare engines, and the API answers 422 if they are requested.
@@ -485,7 +490,8 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
    catalog `step_columns`, every result field not taken from the inputs in `RESULT` extras listed
    in `result_extras`, program-specific records listed in `[trace] records`), and the Python
    algorithm whose step dataclass fields equal the `step_columns` keys. Drivers format output
-   with `book_format_mod` (`book_fixed`, `book_fixed_nearest`, the `trace_*` helpers and
+   with `book_format_mod` (`book_fixed`, `book_fixed_nearest`, the Chapter 4 `book_e` and
+   `fixed_leading_zero`, the `trace_*` helpers and
    `no_commas` for `ERROR` messages) and, when they take a function preset, parse their flags
    with `cli_mod`'s `parse_arguments`; they do not keep private copies of these helpers.
 2. Create `python/src/gerald_na/engines/adapters/<name>.py` with a `ProgramAdapter` subclass:
