@@ -27,7 +27,8 @@ numerical_analysis/
     algorithms/                standard-library-only algorithms returning frozen result dataclasses
     expr/                      safe expression compiler for learner functions (ast whitelist)
     engines/                   Python engine, trace parser and FortranRunner
-    registry/                  catalog loader and integrity checks
+    registry/                  catalog loader, integrity checks, generated Markdown (README index, errata tables)
+    tools/                     developer tools (book_machine: chopped-arithmetic emulation)
     web/                       FastAPI app factory (create_app), templates, static files
     errors.py                  typed errors with stable codes
     settings.py                pydantic-settings Settings
@@ -309,7 +310,9 @@ the reference example.
   * blank preset expressions, or ones that do not compile;
   * defaults or practice overrides out of bounds.
 
-  Files that no entry references, such as the un-migrated Chapter 4/5 PDFs, are never inspected.
+  Files that no entry references are never inspected, so scans that are not catalogued yet (the
+  Chapter 4/5 PDFs that upstream `main` adds under `legacy_code/fortran/chapter_4/` and
+  `chapter_5/`, not merged into this branch) cannot make the check fail.
   `gerald-na catalog check` prints the problems and exits with status 1. `gerald-na catalog list`
   prints the index. The test `python/tests/unit/test_catalog_integrity.py` requires an empty
   list.
@@ -342,6 +345,21 @@ decimal one (IBM 1620 class) and chapter 3 on a 27-bit binary one (IBM 7090 clas
 confirmed. Nothing in the modern code depends on the answer: the engines compute in IEEE real64
 (real32 with `SINGLE`), the book text imitates the printer (chopped digits, no leading zero), and
 the golden tests compare numbers within the DD4 tolerances.
+
+**Re-running the evidence.** Every number above comes from
+`python/src/gerald_na/tools/book_machine.py` (standard library only). It models a machine as a
+mantissa of N binary or decimal digits whose every result is chopped (exact `Fraction`
+arithmetic, then truncation toward zero), and replays the Simpson, Romberg and bisection cards
+in the listings' operation order, plus the Bairstow coefficient echo:
+
+```sh
+cd python
+uv run python -m gerald_na.tools.book_machine                 # 27-bit binary, 8- and 9-digit decimal
+uv run python -m gerald_na.tools.book_machine --bits 24 --digits 7   # other models
+```
+
+`python/tests/unit/test_book_machine.py` pins the quoted values, so this section and the tool
+cannot drift apart.
 
 ## Engines
 
