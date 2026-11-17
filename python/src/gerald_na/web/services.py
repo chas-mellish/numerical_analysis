@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar, Literal, get_args
 
+from pydantic import ValidationError
+
 from gerald_na.engines import (
     CompareReport,
     FortranRunner,
@@ -286,8 +288,11 @@ class WebState:
             request = RunRequest(
                 inputs=dict(inputs), preset=preset, expression=expression, verbose=verbose
             )
-        except ValueError as exc:  # pydantic: preset and expression together, bad preset
-            raise InputError(str(exc).splitlines()[0]) from None
+        except ValidationError as exc:  # pydantic: preset and expression together, bad preset
+            messages = "; ".join(
+                str(err["msg"]).removeprefix("Value error, ") for err in exc.errors()
+            )
+            raise InputError(messages) from None
         coerced, _ = validate_request(entry, request)  # unknown preset, data-only program
         if self.has_adapter(entry):
             # cross-input rules (Lagrange: n must equal the number of points), keyed by field

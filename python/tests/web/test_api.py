@@ -112,6 +112,14 @@ def test_run_with_preset_and_expression(client: TestClient) -> None:
     assert data["preset"] is None
 
 
+def test_run_with_both_preset_and_expression_explains_the_conflict(client: TestClient) -> None:
+    response = run(client, {"preset": 1, "expression": "cos(x) - x"})
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "INPUT"
+    assert error["message"] == "give either a preset or a custom expression, not both"
+
+
 @pytest.mark.fortran
 def test_run_fortran(client: TestClient) -> None:
     data = run(client, {"engine": "fortran"}).json()
