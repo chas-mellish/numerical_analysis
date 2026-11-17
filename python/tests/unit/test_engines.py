@@ -68,7 +68,7 @@ def test_for_entry_fills_the_book_data_card(bisection_entry: CatalogEntry) -> No
     request = RunRequest.for_entry(bisection_entry, {"tol": 1e-3})
     assert request.inputs == {"x1": 0.0, "x2": 1.0, "tol": 1e-3}
     assert request.preset is None
-    assert not request.custom_function
+    assert request.expression is None
 
 
 def test_preset_and_expression_are_exclusive() -> None:

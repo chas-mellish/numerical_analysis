@@ -101,11 +101,6 @@ class RunRequest(BaseModel):
         merged.update(inputs or {})
         return cls(inputs=merged, preset=preset, expression=expression, verbose=verbose)
 
-    @property
-    def custom_function(self) -> bool:
-        """True when the request carries a learner expression instead of a preset."""
-        return self.expression is not None
-
 
 def _check_finite(item: CatalogInput, value: InputValue) -> None:
     for number in item.numbers(value):
