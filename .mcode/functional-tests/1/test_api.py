@@ -5,7 +5,7 @@ import requests
 
 from conftest import BASE_URL, api_run
 
-PROGRAMS = ["ch01_p01", "ch01_p02", "ch03_p01", "ch03_p02", "lagrange_interpolation"]
+PROGRAMS = ["ch01_p01", "ch01_p02", "ch03_p01", "ch03_p02", "ch04_p01", "lagrange_interpolation"]
 BOOK_VALUE = {"ch01_p01": (0.4435729, 1e-6), "ch03_p01": (1.5499312, 1e-7),
               "ch03_p02": (1.6181944, 1e-7), "lagrange_interpolation": (2.3119, 1e-4)}
 

@@ -168,7 +168,7 @@ class TestSharedInputChecks:
 
 
 class TestVerbose:
-    @pytest.mark.parametrize("program", ["ch01_p01", "ch03_p01", "ch03_p02", "lagrange_interpolation"])
+    @pytest.mark.parametrize("program", ["ch01_p01", "ch03_p01", "ch03_p02", "ch04_p01", "lagrange_interpolation"])
     def test_api_python_verbose_matches_fortran(self, program, evidence):
         py = api_run(program, {"engine": "python", "verbose": True})
         ft = api_run(program, {"engine": "fortran", "verbose": True})
@@ -187,7 +187,7 @@ class TestVerbose:
         assert resp.status_code == 200
         assert not resp.json().get("verbose_text")
 
-    @pytest.mark.parametrize("program", ["ch01_p01", "ch03_p01", "ch03_p02", "lagrange_interpolation"])
+    @pytest.mark.parametrize("program", ["ch01_p01", "ch03_p01", "ch03_p02", "ch04_p01", "lagrange_interpolation"])
     def test_cli_python_verbose_matches_fortran(self, program, evidence):
         py = run_cli("run", program, "--engine", "python", "--verbose")
         ft = run_cli("run", program, "--engine", "fortran", "--verbose")
