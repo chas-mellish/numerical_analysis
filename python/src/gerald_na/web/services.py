@@ -17,7 +17,6 @@ Order of checks for a run (both front ends):
    (``BRACKET``, ``NON_CONVERGENT``, ``FORTRAN_RUN``, ...) -> 200.
 """
 
-import math
 import threading
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -36,7 +35,7 @@ from gerald_na.engines import (
     get_adapter,
     validate_request,
 )
-from gerald_na.engines.base import FORTRAN_INT_MAX
+from gerald_na.engines.base import MAX_LIST_ITEMS, input_problem
 from gerald_na.errors import EngineUnavailableError, InputError
 from gerald_na.expr import compile_expr
 from gerald_na.registry import CatalogEntry, CatalogPathError, Registry
@@ -69,9 +68,6 @@ SERVED_FILE_KINDS: tuple[FileKind, ...] = (
     "study",
 )
 """File kinds served by ``GET /files/{program_id}/{kind}`` (DD5)."""
-
-MAX_LIST_ITEMS = 100
-"""Largest number of entries accepted for one list input (form rows or JSON array)."""
 
 MAX_SOURCE_BYTES = 512 * 1024
 """Largest source file embedded inline in a program page tab."""
@@ -119,16 +115,13 @@ class SourceFile:
     missing_reason: str = ""
 
 
-def _is_number(value: object) -> bool:
-    return isinstance(value, int | float) and not isinstance(value, bool)
-
-
 def field_problems(entry: CatalogEntry, raw: Mapping[str, object]) -> dict[str, str]:
     """Per-input problems of ``raw`` (unknown, missing, type, finite, bounds, list length).
 
-    Mirrors :func:`gerald_na.engines.validate_inputs` but collects every problem keyed by
-    input name, so forms and API clients can point at the field. ``_unknown`` collects inputs
-    the catalog does not declare.
+    Uses the same per-input checks as :func:`gerald_na.engines.validate_inputs`
+    (:func:`~gerald_na.engines.base.input_problem`) but collects every problem keyed by input
+    name, so forms and API clients can point at the field. ``_unknown`` collects inputs the
+    catalog does not declare.
     """
     problems: dict[str, str] = {}
     unknown = sorted(set(raw) - set(entry.input_names))
@@ -140,25 +133,9 @@ def field_problems(entry: CatalogEntry, raw: Mapping[str, object]) -> dict[str, 
         if item.name not in raw:
             problems[item.name] = "missing value"
             continue
-        value = raw[item.name]
-        if isinstance(value, list | tuple) and len(value) > MAX_LIST_ITEMS:
-            problems[item.name] = f"at most {MAX_LIST_ITEMS} entries are accepted"
-            continue
-        try:
-            coerced = item.coerce(value)
-        except ValueError as exc:
-            problems[item.name] = str(exc)
-            continue
-        numbers = item.numbers(coerced)
-        if not all(math.isfinite(number) for number in numbers):
-            problems[item.name] = "values must be finite numbers"
-            continue
-        problem = item.check_value(coerced)
+        _, problem = input_problem(item, raw[item.name])
         if problem is not None:
             problems[item.name] = problem
-            continue
-        if item.type == "int" and isinstance(coerced, int) and abs(coerced) > FORTRAN_INT_MAX:
-            problems[item.name] = f"{coerced} does not fit a Fortran integer"
     return problems
 
 

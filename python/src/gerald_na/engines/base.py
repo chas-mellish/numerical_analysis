@@ -32,11 +32,13 @@ from gerald_na.registry.models import InputValue
 
 __all__ = [
     "FORTRAN_INT_MAX",
+    "MAX_LIST_ITEMS",
     "Engine",
     "ProgramResult",
     "RunOutcome",
     "RunRequest",
     "consume_carriage_control",
+    "input_problem",
     "resolve_preset",
     "result_to_dict",
     "step_to_dict",
@@ -46,6 +48,9 @@ __all__ = [
 
 FORTRAN_INT_MAX = 2**31 - 1
 """Largest default-kind Fortran integer; integer inputs without catalog bounds are limited to it."""
+
+MAX_LIST_ITEMS = 100
+"""Largest number of entries accepted for one list input (form rows or JSON array)."""
 
 
 @runtime_checkable
@@ -102,10 +107,27 @@ class RunRequest(BaseModel):
         return cls(inputs=merged, preset=preset, expression=expression, verbose=verbose)
 
 
-def _check_finite(item: CatalogInput, value: InputValue) -> None:
-    for number in item.numbers(value):
+def input_problem(item: CatalogInput, value: object) -> tuple[InputValue | None, str | None]:
+    """Coerce and check one raw value of ``item``.
+
+    Returns ``(coerced, None)``, or ``(None, problem)`` with a message that does not repeat the
+    input's name. Shared by :func:`validate_inputs` and the web layer's per-field checks.
+    """
+    if isinstance(value, list | tuple) and len(value) > MAX_LIST_ITEMS:
+        return None, f"at most {MAX_LIST_ITEMS} entries are accepted"
+    try:
+        coerced = item.coerce(value)
+    except ValueError as exc:
+        return None, str(exc)
+    for number in item.numbers(coerced):
         if not math.isfinite(number):
-            raise InputError(f"input {item.name!r}: {number!r} is not a finite number")
+            return None, f"{number!r} is not a finite number"
+    problem = item.check_value(coerced)
+    if problem is not None:
+        return None, problem
+    if item.type == "int" and isinstance(coerced, int) and abs(coerced) > FORTRAN_INT_MAX:
+        return None, f"{coerced} does not fit a Fortran integer"
+    return coerced, None
 
 
 def validate_inputs(entry: CatalogEntry, raw: Mapping[str, object]) -> dict[str, InputValue]:
@@ -113,8 +135,9 @@ def validate_inputs(entry: CatalogEntry, raw: Mapping[str, object]) -> dict[str,
 
     Every catalog input must be present and no others. Each value must have the input's type
     (numbers only: strings and booleans are rejected), be finite, respect ``min``/``max`` (every
-    element of a list) and, for lists, the fixed ``length``. Integer inputs without bounds must
-    fit a default Fortran integer. Raises :class:`InputError` naming the input.
+    element of a list) and, for lists, the fixed ``length`` and :data:`MAX_LIST_ITEMS`. Integer
+    inputs without bounds must fit a default Fortran integer. Raises :class:`InputError` naming
+    the input.
     """
     unknown = sorted(set(raw) - set(entry.input_names))
     if unknown:
@@ -126,17 +149,9 @@ def validate_inputs(entry: CatalogEntry, raw: Mapping[str, object]) -> dict[str,
     for item in entry.ordered_inputs():
         if item.name not in raw:
             raise InputError(f"missing input {item.name!r} for {entry.id}")
-        value = raw[item.name]
-        try:
-            coerced = item.coerce(value)
-        except ValueError as exc:
-            raise InputError(f"input {item.name!r}: {exc}") from None
-        _check_finite(item, coerced)
-        problem = item.check_value(coerced)
-        if problem is not None:
+        coerced, problem = input_problem(item, raw[item.name])
+        if problem is not None or coerced is None:
             raise InputError(f"input {item.name!r}: {problem}")
-        if item.type == "int" and isinstance(coerced, int) and abs(coerced) > FORTRAN_INT_MAX:
-            raise InputError(f"input {item.name!r}: {coerced} does not fit a Fortran integer")
         validated[item.name] = coerced
     return validated
 
