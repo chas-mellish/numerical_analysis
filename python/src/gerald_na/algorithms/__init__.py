@@ -15,6 +15,7 @@ from gerald_na.algorithms.bairstow import (
 )
 from gerald_na.algorithms.bisection import BisectionResult, BisectionStep, bisection
 from gerald_na.algorithms.simpson import SimpsonResult, SimpsonStep, simpson
+from gerald_na.algorithms.romberg import RombergResult, RombergStep, romberg
 
 __all__ = [
     "BairstowFactor",
@@ -22,6 +23,8 @@ __all__ = [
     "BairstowStep",
     "BisectionResult",
     "BisectionStep",
+    "RombergResult",
+    "RombergStep",
     "Rounding",
     "bairstow",
     "SimpsonResult",
@@ -33,4 +36,5 @@ __all__ = [
     "format_f",
     "format_i",
     "simpson",
+    "romberg",
 ]

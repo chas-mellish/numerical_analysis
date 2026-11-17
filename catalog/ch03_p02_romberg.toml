@@ -1,0 +1,351 @@
+# Chapter 3, Program 2: value of the sine integral Si(B) by Romberg integration.
+# Schema: docs/architecture.md, "Catalog schema". Transcribed from docs/chapter_03_program_02_listing.pdf
+# (book page 74); every value below was read from the scan, not from the OCR text.
+
+id = "ch03_p02"
+title = "Romberg integration, Si(B)"
+method = "Romberg integration"
+summary = """
+Romberg integration improves trapezoidal-rule values by Richardson extrapolation. The book's
+program integrates F(X) = SIN(X)/X from 0 to B (the sine integral Si(B)): it starts with the
+trapezoidal rule on 10 subintervals, halves the step up to 8 times (at most 2560 subintervals),
+and after each halving extrapolates the new column of the triangular table
+TRAP(II+1,I+1) = TRAP(II,I+1) + (TRAP(II,I+1) - TRAP(II,I))/(4**II - 1). It stops as soon as the
+last two entries of the newest line differ by no more than TOL, and prints the whole triangle.
+With the data card 15.0 2.E-7 it prints a 4-line table and VALUE IS 1.6181936 after 80
+subintervals.
+"""
+book_ref_confirmed = true
+precision_notes = """
+The book printed 1.6181936; the true value is Si(15) = 1.6181944437..., and the real64 engines
+print 1.6181944 (value 1.6181944440409433, 2.7e-10 above Si(15)). All four lines of the book's
+table drift low by up to 8.6e-7 compared with IEEE arithmetic, in real64 and in a modern real32
+build alike: the real32 build (make build-fortran-single, IEEE binary32, round to nearest) also
+prints 1.6181944 (value 1.6181945). The deficit comes from the arithmetic of the book's machine,
+not from the method. Arithmetic with a 27-bit binary mantissa and chopped (truncated) results --
+the single-precision format of the IBM 7090/7094 class of machines, whose FORTRAN II named its
+library functions SINF and ABSF as the listing does, and the model that reproduces the
+Simpson program's digit (ch03_p01) -- brings every table entry within 3e-7 of the book
+(1.6181938 for the last two), but not digit for digit: the machine's own SINF routine is not
+known. IEEE binary32 has a 24-bit mantissa and rounds, so its error is smaller and has no
+systematic bias. The golden tests therefore compare both builds with the book within 1e-6, and
+real64 tightly with its own values.
+
+Every arithmetic model tried (real64, real32, 27-bit chopped binary, 8- and 9-digit decimal)
+stops after the third halving with 80 subintervals, the tolerance test of the scan
+|TRAP(I+1,I+1) - TRAP(I,I+1)| <= TOL being met by the last two entries of line 4 (book:
+1.6181936 and 1.6181936) and not by line 3 (1.6182008 and 1.6181940).
+
+Printing: computed values are chopped, without a leading zero, like the book's printer
+(1.6077254 in real64 against the book's 1.6077255 -- a precision effect, not a printing one).
+The input echoes B (F6.2) and TOL (E14.7) are rounded to nearest, because the card values were
+exact on the original machine; chopping the binary value of 2.E-7 would print 1.9999999E-07.
+
+Precision also decides when TOL can be met at all. A tighter TOL is not always slower: once the
+extrapolated entries agree to the last bit the difference is exactly zero and any TOL >= 0 is
+met (the book card with TOL = 1.E-14 stops after 320 subintervals in real64). In real32 this
+happens much earlier, so a run that does not converge in real64 (preset 3, B = 100,
+TOL = 1.E-13) can converge in real32.
+"""
+book_output = """
+VALUE OF SINE INTEGRAL BETWEEN 0 AND  15.00 BY ROMBERG INTEGRATION
+
+1.6077255
+1.6156591 1.6183036
+1.6175654 1.6182008 1.6181940
+1.6180369 1.6181940 1.6181936 1.6181936
+
+VALUE IS  1.6181936,
+  80 SUBINTERVALS WERE REQUIRED TO MEET TOLERANCE OF  2.0000000E-07
+"""
+
+[book_ref]
+chapter = 3
+program = 2
+page = 74
+title = "Numerical Integration"
+
+# ------------------------------------------------------------------ inputs (data-card order)
+# READ 100, B, TOL   /   100 FORMAT (F10.0, E10.0)
+
+[[inputs]]
+name = "b"
+type = "real"
+label = "B"
+default = 15.0
+min = 0.01
+max = 100.0
+help = "Upper limit of integration; the integral is taken from 0 to B (the book prints B with F6.2)."
+card = 1
+
+[[inputs]]
+name = "tol"
+type = "real"
+label = "TOL"
+default = 2.0e-7
+min = 1.0e-14
+max = 1.0
+help = "Stop when the last two entries of the newest table line differ by at most TOL (after at most 8 halvings)."
+card = 1
+
+[data_card]
+# Columns 1-10 and 11-20 of the card (FORMAT F10.0, E10.0); 2.E-7 is right-justified in its field.
+text = "15.0           2.E-7"
+values = { b = 15.0, tol = 2.0e-7 }
+note = "Drivers read the card list-directed, so the printed card works unchanged."
+
+# ------------------------------------------------------------------ function presets (DD3)
+
+[function]
+takes_function = true
+variable = "x"
+default_preset = 1
+
+[[function.presets]]
+id = 1
+label = "Book: sin(x)/x (the sine integral)"
+expr = "SIN(X)/X"
+fortran_preset = 1
+note = "The book's statement function FCN(X) = SINF(X)/X. Its limit 1 at X = 0 is the literal 1. of SUM = 1. + FCN(B); both engines use it as F(0)."
+
+[[function.presets]]
+id = 2
+label = "exp(-x^2)"
+expr = "EXP(-X**2)"
+fortran_preset = 2
+note = "The integral from 0 to B is sqrt(pi)/2 * erf(B), which tends to 0.8862269 for large B."
+
+[[function.presets]]
+id = 3
+label = "1/(1+x^2)"
+expr = "1/(1+X**2)"
+fortran_preset = 3
+note = "The integral from 0 to B is atan(B), which tends to pi/2 for large B."
+
+# ------------------------------------------------------------------ trace protocol (DD2)
+
+[trace]
+step_columns = [
+    { key = "k", label = "I", format = "I3" },
+    { key = "panels", label = "K", format = "I5" },
+    { key = "h", label = "H", format = "E15.7" },
+    { key = "trap", label = "TRAP(1,I+1)", format = "F10.7" },
+    { key = "best", label = "TRAP(I+1,I+1)", format = "F10.7" },
+    { key = "diff", label = "|TRAP(I+1,I+1) - TRAP(I,I+1)|", format = "E15.7" },
+]
+records = [
+    { type = "TABLE", fields = ["row", "col", "value"], description = "One cell TRAP(row,col) of the triangular table: row = extrapolation order (1 = trapezoidal rule), col = halving index + 1 (10*2**(col-1) subintervals). Every computed cell, in the book's printing order; printed line L is TRAP(1..L, L)." },
+]
+result_extras = [
+    { key = "subintervals", type = "int", description = "Subintervals of the last trapezoidal sum, the book's K (80 for the data card, 2560 when TOL was not met)." },
+]
+
+# ------------------------------------------------------------------ golden expectations (DD4)
+
+[[expected]]
+name = "value"
+kind = "real"
+description = "VALUE IS 1.6181936, (real64: Si(15) = 1.6181944)"
+book_value = 1.6181936
+tol_real64 = 1.0e-6
+tol_real32 = 1.0e-6
+real64_value = 1.6181944440409433
+tol_real64_value = 1.0e-12
+
+[[expected]]
+name = "subintervals"
+kind = "int"
+description = "80 SUBINTERVALS WERE REQUIRED TO MEET TOLERANCE OF 2.0000000E-07 (identical in real32 and real64)"
+book_value = 80
+
+[[expected]]
+name = "iterations"
+kind = "int"
+description = "3 halvings: the 4 printed lines of the table (identical in real32 and real64)"
+book_value = 3
+
+[[expected]]
+name = "table"
+kind = "table"
+description = "The printed triangular table; line L is TRAP(1..L, L)."
+book_value = [
+    [1.6077255],
+    [1.6156591, 1.6183036],
+    [1.6175654, 1.6182008, 1.6181940],
+    [1.6180369, 1.6181940, 1.6181936, 1.6181936],
+]
+tol_real64 = 1.0e-6
+tol_real32 = 1.0e-6
+real64_value = [
+    [1.6077254882237955],
+    [1.6156591451081934, 1.6183036974029927],
+    [1.6175654728738844, 1.6182009154624482, 1.6181940633330785],
+    [1.61803750041448, 1.618194842928012, 1.618194438092383, 1.6181944440409433],
+]
+tol_real64_value = 1.0e-12
+
+# ------------------------------------------------------------------ files
+
+[files]
+legacy = ["legacy_code/fortran/chapter_3/integration.f90"]
+scan_pdf = "docs/chapter_03_program_02_listing.pdf"
+fortran_module = "fortran/src/romberg_mod.f90"
+fortran_app = "fortran/app/ch03_p02_romberg.f90"
+fortran_executable = "ch03_p02_romberg"
+python_callable = "gerald_na.algorithms.romberg:romberg"
+study_page = "content/ch03_p02.md"
+
+[chart]
+kind = "romberg_heatmap"
+options = { table_field = "table", row_label = "Line L (10*2**(L-1) subintervals)", column_label = "Extrapolation order", color = "log10_error_vs_best", step_diff_key = "diff", tolerance_input = "tol" }
+
+# ------------------------------------------------------------------ practice questions
+# Reference answers computed with the engines in real64 (Python and Fortran agree bit for bit).
+
+[[practice]]
+id = "book-subintervals"
+prompt = "Run the book's data card (15.0 2.E-7). How many subintervals does the last trapezoidal sum use when TOL is met?"
+answer_field = "subintervals"
+answer = 80
+tolerance = 0.0
+explanation = "After the third halving (10 -> 20 -> 40 -> 80 subintervals) the last two entries of line 4 differ by 5.9e-9 <= 2e-7; line 3 still differed by 6.9e-6."
+
+[[practice]]
+id = "book-value"
+prompt = "What value does the program report for Si(15)? Give it to 7 decimals."
+answer_field = "value"
+answer = 1.6181944440409433
+tolerance = 5.0e-7
+explanation = "Real64 gives 1.6181944, the true Si(15) to 7 decimals. The book printed 1.6181936 because its 1970s machine chopped every result to 27 bits; the method is not to blame."
+
+[[practice]]
+id = "si-one"
+prompt = "Compute Si(1) with the book's integrand: B = 1 and TOL = 1.E-10. What value is reported (9 decimals), and how many subintervals are used?"
+inputs = { b = 1.0, tol = 1.0e-10 }
+answer_field = "value"
+answer = 0.9460830703671839
+tolerance = 5.0e-10
+explanation = "Si(1) = 0.946083070, reached after 3 halvings (80 subintervals): on the short interval SIN(X)/X is very smooth, and the last test difference is only 1e-15."
+
+[[practice]]
+id = "gauss-value"
+prompt = "Choose preset 2, exp(-x^2), with B = 3 and TOL = 1.E-8. What value is reported (7 decimals)?"
+inputs = { b = 3.0, tol = 1.0e-8 }
+preset = 2
+answer_field = "value"
+answer = 0.8862073480876166
+tolerance = 5.0e-8
+explanation = "The exact value is sqrt(pi)/2 * erf(3) = 0.8862073482595..., reached after only 2 halvings (40 subintervals): the integrand is smooth, so each extrapolation removes a whole power of h**2."
+
+[[practice]]
+id = "runge-not-converged"
+prompt = "Choose preset 3, 1/(1+x^2), with B = 100 and TOL = 1.E-13. Is the tolerance met within the book's 8 extrapolations?"
+inputs = { b = 100.0, tol = 1.0e-13 }
+preset = 3
+answer_field = "converged"
+answer = false
+tolerance = 0.0
+explanation = "No: the program prints the full 9-line table and VALUE IS 1.5607966 BUT DID NOT MEET TOLERANCE OF 1.0000000E-13. The value is still atan(100) = 1.5607966602 to 9 digits; at 2560 subintervals the last two entries still differ by a few 1e-13."
+
+[[practice]]
+id = "tight-tol-subintervals"
+prompt = "Keep B = 15 but tighten TOL to 1.E-10. How many subintervals are needed now?"
+inputs = { tol = 1.0e-10 }
+answer_field = "subintervals"
+answer = 160
+tolerance = 0.0
+explanation = "Line 5 (160 subintervals) is the first whose last two entries differ by less than 1e-10. Each halving adds one extrapolation order, so the error drops very fast."
+
+# ------------------------------------------------------------------ errata
+# Mirrored in the ERRATA header of fortran/app/ch03_p02_romberg.f90 and on content/ch03_p02.md.
+
+[[errata]]
+id = "fcn-call-slip"
+kind = "ocr_slip"
+original = "SUM = 1. + FCNI(B)"
+corrected = "SUM = 1. + FCN(B)"
+note = "Text-transcription slip; the scan calls the statement function FCN."
+
+[[errata]]
+id = "do-20-slip"
+kind = "ocr_slip"
+original = "DO 20 1 = 1, 8"
+corrected = "DO 20 I = 1,8"
+note = "The loop variable I was read as the digit 1; the halving loop runs I = 1..8."
+
+[[errata]]
+id = "extrapolation-line"
+kind = "ocr_slip"
+original = "40 TRAP(II+1, I+1) = TRAP(II+1, I+1) + 1./(4.**II - 1.)*(TRAP(II+1, I+1)) - TRAP(II, 1))"
+corrected = "40 TRAP(II+1,I+1) = TRAP(II,I+1) + 1./(4.**II - 1.)*(TRAP(II,I+1) - / 1 TRAP(II,I))"
+note = "The scan's Richardson step uses the previous order of the same column and of the previous column, written over a continuation card."
+
+[[errata]]
+id = "tolerance-test"
+kind = "ocr_slip"
+original = "IF (ABSF(TRAP(II+1, I+1)) — TRAP(II+1, I+1)) - TOL) 50, 50, 20"
+corrected = "IF (ABSF(TRAP(I+1,I+1) - TRAP(I,I+1))- TOL) 50,50,20"
+note = "Compares the last two entries of the newest table line. Verified on the book table: line 3 (1.6182008, 1.6181940) fails, line 4 (1.6181936, 1.6181936) passes, giving 80 subintervals as printed."
+
+[[errata]]
+id = "format-202-slip"
+kind = "ocr_slip"
+original = "202 FORMAT (/ 10H VALUE IS , F10.7s, 2H, / I5,"
+corrected = "202 FORMAT (/ 10H VALUE IS , F10.7, 2H, / I5,"
+note = "Stray s in the OCR text; 2H, is the comma and blank printed after the value."
+
+[[errata]]
+id = "format-201-no-i5"
+kind = "ocr_slip"
+original = "201 FORMAT (/ 10H VALUE IS , F10.7, I5, 31H BUT DID NOT MEET TOLERANCE OF / 1 E14.7)"
+corrected = "201 FORMAT (/ 10H VALUE IS , F10.7, 31H BUT DID NOT MEET TOLERANCE OF / 1 E14.7)"
+note = "The scan has no I5 in format 201, which matches its list PRINT 201, TRAP(9,9), TOL. K is not printed when TOL is not met (DO 60 K = 1,9 reuses K anyway). The 31H text ends with the blank that follows OF on the card."
+
+[[errata]]
+id = "minor-ocr-slips"
+kind = "ocr_slip"
+original = "ZZJ0B S; #LIST PRINTER; x = H; BETWEEN O AND; (lH ,8F10.7); output 16077255"
+corrected = "ZZJOB 5; *LIST PRINTER; X = H; BETWEEN 0 AND; (1H ,8F10.7); output 1.6077255"
+note = "Character-level slips of the text transcription; the job-control cards are not part of the program."
+
+[[errata]]
+id = "sinc-seed"
+kind = "original_quirk"
+original = "SUM = 1. + FCN(B)"
+corrected = "SUM = F0 + F(B), F0 = F(0) by default; the book's 1. (BOOK_SEED) for SIN(X)/X"
+note = "The literal 1. is FCN(0), the limit of SIN(X)/X, which the statement function cannot evaluate. The modern code seeds with the ordinate at 0: the Fortran preset f_sinc returns 1 there, and the Python adapter passes the book's 1.0 as f0 when the function is SIN(X)/X (same convention as ch03_p01). Presets 2 and 3 use their own F(0)."
+
+[[errata]]
+id = "e-format-digits"
+kind = "original_quirk"
+original = "E14.7 printed as 2.0000000E-07"
+corrected = "ES14.7 (one digit before the decimal point)"
+note = "The book's machine printed E fields with one leading digit and 8 significant digits; a modern E14.7 would print 0.2000000E-06. The driver uses ES14.7 so the line matches the scan."
+
+[[errata]]
+id = "table-row-alignment"
+kind = "original_quirk"
+original = "table lines printed starting in the column of VALUE"
+corrected = "203 FORMAT (1H ,8F10.7) as written: one more leading blank"
+note = "FORMAT 203 writes a carriage-control blank and then F10.7 fields with their own leading blank, so each table line starts one column to the right of VALUE IS. The scan (measured) shows them one column to the left of that; the VALUE IS and 80 SUBINTERVALS lines match their formats exactly. The modern output follows the FORMAT; book_output above is the scan as printed."
+
+[[errata]]
+id = "machine-digits"
+kind = "original_quirk"
+original = "1.6181936 (book), every table entry 1e-7 to 8.6e-7 low"
+corrected = "1.6181944 (real64 = Si(15)), real32 1.6181945"
+note = "The book's machine chopped its results to a 27-bit mantissa; IEEE arithmetic rounds. Computed values are printed chopped without a leading zero like the book's printer; the input echoes B and TOL are rounded to nearest (they were exact on the card). The golden tests compare numbers within 1e-6."
+
+[[errata]]
+id = "non-convergence-result"
+kind = "modernization"
+original = "PRINT 200, B / DO 60 ... PRINT 203 / PRINT 201, TRAP(9,9), TOL / CALL EXIT"
+corrected = "RESULT with converged=F, the 9-line table, value TRAP(9,9), 2560 subintervals, exit status 0"
+note = "Not meeting TOL after 8 extrapolations is the book's documented outcome, not an error: both engines return a result (Python converged=False, trace converged=F). Line 9 holds 9 values and wraps after 8, as format reversion of 203 prints it."
+
+[[errata]]
+id = "structured-control-flow"
+kind = "modernization"
+original = "arithmetic IF (...) 50,50,20; statement function FCN(X) = SINF(X)/X; READ 100 (F10.0, E10.0); CALL EXIT"
+corrected = "IF block inside the DO loop; F passed as a procedure argument (--preset N); list-directed READ; normal end with exit status"
+note = "The operation order of every statement is kept with explicit parentheses ((X + H) + H, (H/2.)*SUM, (1./(4.**II - 1.))*(...)), so the Fortran and Python engines agree bit for bit. SINF/ABSF are SIN/ABS."
