@@ -466,6 +466,21 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
   text, and for the data card Python's `book_text(carriage_control=True)` equal to the driver's
   stdout. In practice the two engines agree bit for bit.
 
+### Program notes: ch01_p02 (Bairstow)
+
+* Data-only program (`takes_function = false`): the driver rejects `--preset`. Card 1 is the
+  `real_list` input `a` (seven coefficients, X**6 first), card 2 is `r1 s1 test lim n`; the generic
+  `serialize_card` writes one line per card.
+* Trace: `STEP` rows carry `factor` and `k` (KOUNT restarts at 1 per factor and after a
+  zero-denominator nudge); a `FACTOR` record follows the last `STEP` of each factor; `RESULT`
+  `value` is the number of factors (an integer) with the extra `nudges`. Errors: `NON_CONVERGENT`
+  (book FORMAT 24) and `DEGREE` (N outside 2..6 or a nonzero coefficient above X**N).
+* `--verbose` text (true factors X**2 - R X - S and roots) is identical on both engines
+  (`BairstowResult.verbose_text`), checked by `python/tests/parity/test_bairstow_parity.py`.
+  Its parity input generator (`CUSTOM_GENERATORS["ch01_p02"]`) draws the coefficients with N.
+* Book text: factor lines use RZ (the book's chopped digits); the echoed coefficients use RN,
+  because binary 99.41 would chop to 99.40999.
+
 ## Conventions
 
 * Python results are frozen dataclasses with `value`, `converged`, `iterations`, `steps` and a
