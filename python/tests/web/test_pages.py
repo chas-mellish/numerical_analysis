@@ -1,12 +1,16 @@
 """HTML pages: home, program page, reset form, tabs, scan-missing state, error pages."""
 
+import asyncio
 import re
+from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
 from markupsafe import escape
+from starlette.types import Message, Receive, Scope, Send
 
 from gerald_na.registry import get_registry
+from gerald_na.web.middleware import BodySizeLimitMiddleware
 from tests.web.conftest import BISECTION
 
 PROGRAM_TESTIDS = [
@@ -251,3 +255,58 @@ def test_request_body_limit(client: TestClient, size: int) -> None:
         f"/programs/{BISECTION}/run", content=b"a" * size, headers={"content-type": "text/plain"}
     )
     assert response.status_code == 413
+
+
+def _chunks(total: int, size: int = 8 * 1024) -> Iterator[bytes]:
+    sent = 0
+    while sent < total:
+        yield b"a" * size
+        sent += size
+
+
+def test_request_body_limit_streamed_html(client: TestClient) -> None:
+    response = client.post(
+        f"/programs/{BISECTION}/run",
+        content=_chunks(70 * 1024),
+        headers={"content-type": "application/x-www-form-urlencoded"},
+    )
+    assert response.status_code == 413
+
+
+def test_api_request_body_limit_declared(client: TestClient) -> None:
+    response = client.post(
+        f"/api/programs/{BISECTION}/run",
+        content=b"a" * (70 * 1024),
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 413
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json()["error"]["code"] == "TOO_LARGE"
+
+
+def test_api_request_body_limit_streamed(client: TestClient) -> None:
+    response = client.post(
+        f"/api/programs/{BISECTION}/run",
+        content=_chunks(70 * 1024),
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "TOO_LARGE"
+
+
+def test_malformed_content_length_is_rejected() -> None:
+    sent: list[Message] = []
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        raise AssertionError("the app must not run")
+
+    async def receive() -> Message:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: Message) -> None:
+        sent.append(message)
+
+    middleware = BodySizeLimitMiddleware(app, max_bytes=10)
+    scope: Scope = {"type": "http", "path": "/", "headers": [(b"content-length", b"abc")]}
+    asyncio.run(middleware(scope, receive, send))
+    assert sent[0]["status"] == 413

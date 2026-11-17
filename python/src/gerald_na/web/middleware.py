@@ -1,6 +1,11 @@
 """ASGI middleware: request-body size limit and security headers."""
 
+import json
+
+from starlette.exceptions import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from gerald_na.web.api import error_body
 
 __all__ = ["MAX_BODY_BYTES", "BodySizeLimitMiddleware", "SecurityHeadersMiddleware"]
 
@@ -23,12 +28,17 @@ CONTENT_SECURITY_POLICY = "; ".join(
 )
 
 
-class _BodyTooLarge(Exception):
-    pass
+TOO_LARGE_MESSAGE = "request body too large"
 
 
 class BodySizeLimitMiddleware:
-    """Reject request bodies above ``max_bytes`` with 413 (Content-Length or streamed size)."""
+    """Reject request bodies above ``max_bytes`` with 413 (Content-Length or streamed size).
+
+    A declared Content-Length is rejected here, before the app runs; ``/api`` paths get the
+    JSON error body (code ``TOO_LARGE``). A streamed body that grows past the limit raises
+    :class:`HTTPException` (413) from ``receive``, which FastAPI re-raises so the app's own
+    handler renders it like any other HTTP error.
+    """
 
     def __init__(self, app: ASGIApp, max_bytes: int = MAX_BODY_BYTES) -> None:
         self.app = app
@@ -45,10 +55,9 @@ class BodySizeLimitMiddleware:
                 except ValueError:
                     declared = self.max_bytes + 1
                 if declared > self.max_bytes:
-                    await self._reject(send)
+                    await self._reject(scope, send)
                     return
         received = 0
-        response_started = False
 
         async def limited_receive() -> Message:
             nonlocal received
@@ -56,29 +65,25 @@ class BodySizeLimitMiddleware:
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
                 if received > self.max_bytes:
-                    raise _BodyTooLarge
+                    raise HTTPException(413, TOO_LARGE_MESSAGE)
             return message
 
-        async def tracking_send(message: Message) -> None:
-            nonlocal response_started
-            if message["type"] == "http.response.start":
-                response_started = True
-            await send(message)
+        await self.app(scope, limited_receive, send)
 
-        try:
-            await self.app(scope, limited_receive, tracking_send)
-        except _BodyTooLarge:
-            if not response_started:
-                await self._reject(send)
-
-    async def _reject(self, send: Send) -> None:
-        body = b"request body too large"
+    async def _reject(self, scope: Scope, send: Send) -> None:
+        path = scope.get("path", "")
+        if path == "/api" or path.startswith("/api/"):
+            body = json.dumps(error_body("TOO_LARGE", TOO_LARGE_MESSAGE)).encode()
+            content_type = b"application/json"
+        else:
+            body = TOO_LARGE_MESSAGE.encode()
+            content_type = b"text/plain; charset=utf-8"
         await send(
             {
                 "type": "http.response.start",
                 "status": 413,
                 "headers": [
-                    (b"content-type", b"text/plain; charset=utf-8"),
+                    (b"content-type", content_type),
                     (b"content-length", str(len(body)).encode()),
                 ],
             }
