@@ -129,7 +129,14 @@ Command-line behaviour of every driver:
   with 1; trace mode prints the `ERROR` record and exits with 2.
 
 On the Python side, `gerald_na.engines.trace` holds the generic parser and `FortranRunner` maps
-the records into the same result dataclasses that the Python engine returns.
+the records into the same result dataclasses that the Python engine returns (see "Engines"
+below). A `RESULT` record carries every result field that does not come from the request, so the
+dataclass can be rebuilt from the trace alone; for bisection these are the extras
+`root_at_endpoint`, `fx1` and `fx2` (F at the data card's X1 and X2).
+
+A function value that is not finite (NaN or an infinity, for example `EXP(-X)` overflowing for
+X < -709 in real64) is an `INPUT` error on both engines, reported after the rows completed
+before it.
 
 ### DD3: Functions on the Fortran engine
 
@@ -306,11 +313,165 @@ the reference example.
   prints the index. The test `python/tests/unit/test_catalog_integrity.py` requires an empty
   list.
 
+## Engines
+
+`gerald_na.engines` runs a catalog program on either engine and returns the same result
+dataclass from both (for example `BisectionResult`), so the UI, the golden tests and compare mode
+never depend on the engine.
+
+### API
+
+```python
+from gerald_na.engines import RunRequest, run_program, compare, get_engine, available_engines
+
+request = RunRequest.for_entry(entry, {"tol": 1e-3}, preset=2)   # book card + overrides
+outcome = run_program("ch01_p01", request, "fortran")            # or "python", or an Engine
+report = compare("ch01_p01", request)                            # python vs fortran diff
+```
+
+* `RunRequest(inputs, preset=None, expression=None, verbose=False)`: inputs keyed by catalog
+  input name; `preset` (default: the catalog `default_preset`) and `expression` (a learner
+  function, Python engine only) are mutually exclusive. `RunRequest.for_entry(entry, overrides)`
+  starts from the book data card.
+* `Engine.run(entry, request) -> RunOutcome`; engines: `PythonEngine` (`name = "python"`) and
+  `FortranRunner` (`name = "fortran"`). `get_engine(name, settings)` builds one (respecting
+  `engines_enabled`); `available_engines(settings, entry=None)` lists the enabled engines that
+  can run now (Fortran only when the driver is built).
+* `RunOutcome`: `engine`, `program_id`, `inputs` (validated), `preset`, `expression`, exactly
+  one of `result` (the program's result dataclass) and `error` (a typed `GeraldNAError` with
+  `code`, `message` and the partial `steps`), `book_text`, `elapsed_ms`, `verbose_text`, and for
+  Fortran `raw_stdout` (book-mode stdout, carriage-control blanks kept) and `trace_text`.
+  Properties `ok`, `status` (`OK` or the error code), `steps`; `to_dict()` gives JSON.
+* `book_text` is the line-printer text with the carriage-control column consumed, as in the
+  scan, on both engines: Python's `result.book_text()` (or the error's `book_output`), Fortran's
+  own book-mode stdout. Python's `book_text(carriage_control=True)` equals the driver's stdout
+  character for character (checked by the parity tests).
+* `compare(program_id, request, engines=("python", "fortran"), rel_tol=0, abs_tol=0)` runs both
+  engines and returns a `CompareReport`: per step column the largest absolute and relative
+  difference and the first differing row, the differing cells, mismatched iteration and row
+  counts, both outcomes' statuses, the difference of the final values, and `matches`.
+  `diff_outcomes(entry, left, right)` diffs two existing outcomes.
+* Command line: `gerald-na run <program_id> [--engine python|fortran|compare] [--preset N]
+  [--expr "..."] [--input name=value ...] [--verbose] [--trace-json] [--bin-dir DIR]` prints the
+  book text (or JSON); exit status 0 success, 1 a book error path or engine failure, 2 an invalid
+  request. Lists are given comma-separated, point lists as `x1,y1,x2,y2,...`.
+
+Error contract of `Engine.run`: problems with the request are raised before anything runs --
+`InputError` (unknown or missing input, wrong type, strings or booleans, NaN or infinity, outside
+the catalog `min`/`max`, wrong list length, integers that do not fit a Fortran integer, unknown
+preset; `ExpressionError` for a bad learner function; a learner function sent to the Fortran
+engine) and `EngineUnavailableError` (engine disabled, program without an adapter, driver not
+built). Everything that happens while the program runs is returned in `outcome.error`: the book
+errors (`BracketError`, `ZeroProductError`, `NonConvergenceError`, ...), `InputError` for a
+function value that is not finite, and `FortranRunError` for a timeout, a crash or a protocol
+violation. When a *preset* cannot be evaluated the Python engine reports `INPUT` like the
+Fortran driver; `EXPRESSION` is reserved for the learner's own function.
+
+### Python engine
+
+`PythonEngine` compiles the preset's catalog expression (the same text as the Fortran
+`select case`) or the learner's expression with `gerald_na.expr` and calls the algorithm through
+the program's adapter. As in Fortran, an integer literal exponent (`X**3`) is an integer power
+evaluated by multiplication (square-and-multiply in libgcc's `__powidf2` order) and a real
+exponent (`X**3.`) uses `pow`; this keeps the presets bit-identical to the compiled drivers (for
+`x**3 - x - 1` near its root, `pow` would differ by an ulp of x**3, 5e-11 relative after the
+cancellation).
+
+### Fortran runner and its safety rules
+
+`FortranRunner(settings=None, *, bin_dir=None, registry=None, timeout_s=None,
+max_output_bytes=1_000_000, label=None)`; `bin_dir` defaults to `settings.fortran_bin_dir`
+(`build/bin`) and may name another build, for example `settings.fortran_single_bin_dir`
+(`build/single/bin`, `make build-fortran-single`). Relative directories resolve under the
+repository root.
+
+* **Executable whitelist.** Only the `files.fortran_executable` names of the loaded catalog can
+  run, only from `bin_dir`, and the entry passed in must equal the catalog's entry for its id, so
+  a forged entry cannot name another file. A missing or non-executable driver is
+  `EngineUnavailableError`.
+* **No shell, numeric stdin.** `subprocess.run([driver, flags...], input=card,
+  capture_output=True, timeout=settings.run_timeout_s, shell=False)` with the fixed flags
+  `--trace`, `--verbose` and `--preset <int>` (the preset's `fortran_preset`). The card is written
+  by the adapter from inputs already validated against the catalog. The environment is reduced to
+  `PATH`, `LC_ALL=C`, `LANG=C` and the shared-library path, so `GFORTRAN_*` settings of the server
+  cannot change the drivers' behaviour.
+* **Bounded runs.** The timeout (`run_timeout_s`, default 5 s) kills a hung driver and becomes a
+  `FortranRunError`; stdout plus stderr above `max_output_bytes` is a `FortranRunError` (the
+  timeout bounds what can be produced before the check).
+* **Learner functions are refused** (`InputError`, DD3); the web layer answers 422.
+* **Exit status mapping.** Trace mode: 0 with a `RESULT` record is success; 2 with an `ERROR`
+  record becomes the typed error of its code (`errors.TRACE_ERROR_CODES`), carrying the `STEP`
+  rows printed before it; an unknown code, a missing or misplaced terminal record, any malformed
+  line, any other status or a signal is a `FortranRunError` quoting the end of stderr. Book mode
+  accepts 0 and 1 (a book error path).
+* **Two runs per request.** One `--trace` run is parsed into the result; one book-mode run
+  captures the driver's own line-printer text for the UI (`raw_stdout`, `book_text`); a `verbose`
+  request adds a `--verbose` run whose extras go to `verbose_text`. Each takes a few
+  milliseconds. `FortranRunner.execute(entry, card, preset=, trace=, verbose=)` is the
+  single-run primitive (used by the golden test that feeds the card exactly as printed).
+
+### Trace parser
+
+`gerald_na.engines.trace.parse_trace(text) -> Trace` is program-independent. Each line becomes a
+`Record(type, fields, line)`; values are typed by spelling (`T`/`F` -> bool, integer literal ->
+int, anything `float()` accepts -> float, otherwise text) and read with `record.real(key)`,
+`.integer(key)`, `.logical(key)` and `.text(key)`. The `message` of an `ERROR` record runs to the
+end of the line. `Trace.steps`, `.of_type("TABLE")`, `.result` and `.error` give access by record
+type. Blank lines and trailing padding are ignored; a lower-case or missing record type, a field
+that is not `key=value`, a duplicate or empty field, a line over 4096 characters, no terminal
+record, more than one, or one that is not last, and a `RESULT` without `value`, `converged` and
+`iterations` (or an `ERROR` without `code` and `message`) raise `FortranRunError`.
+
+### Adding a program to the engines
+
+Program-specific code lives only in adapters (`gerald_na.engines.programs.ProgramAdapter`). To
+add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
+
+1. Write the catalog file, the Fortran module and driver (with `--trace` per DD2: `STEP` keys =
+   catalog `step_columns`, every result field not taken from the inputs in `RESULT` extras listed
+   in `result_extras`, program-specific records listed in `[trace] records`), and the Python
+   algorithm whose step dataclass fields equal the `step_columns` keys.
+2. Create `python/src/gerald_na/engines/adapters/<name>.py` with a `ProgramAdapter` subclass:
+   * `program_id`, `result_type` (the result dataclass) and `step_type` (the step dataclass);
+   * `run_python(entry, inputs, function)`: call the algorithm with the validated inputs (keyed by
+     catalog input name) and the compiled function (`None` for data-only programs such as
+     Bairstow and Lagrange);
+   * `result_from_trace(entry, inputs, trace)`: build `result_type` from `trace.result`, the
+     steps from `self.steps_from_trace(entry, trace)` and other records (for example
+     `trace.of_type("TABLE")` for the Romberg table, `trace.of_type("FACTOR")` for Bairstow), and
+     raise `FortranRunError` on inconsistent records;
+   * optionally override `data_card(entry, inputs)` when the driver's `READ` statements need a
+     layout other than the generic one (one line per catalog `card`, numbers with `repr`
+     precision, every `point_list` pair on its own line), `steps_from_trace` when the `STEP`
+     records are not one flat list, and `verbose_text` for Python-side extras.
+3. Import it in `gerald_na/engines/adapters/__init__.py` and add an instance to `_BUILTIN`.
+4. Run the tests: the golden tests, the parity tests and `test_every_catalog_entry_has_an_adapter`
+   pick the new catalog entry up automatically. If the program's inputs constrain each other
+   (Lagrange's `n` and its number of points), register an input generator in
+   `CUSTOM_GENERATORS` of `python/tests/parity/test_parity.py`.
+
+### Golden and parity tests
+
+* `python/tests/golden/test_golden.py` runs every catalog entry's data card on the Python engine,
+  the default Fortran build (`build/bin`) and the `SINGLE` build (`build/single/bin`) and checks
+  every `[[expected]]` entry with the DD4 policy (real64 engines against `real64_value` and
+  `tol_real64`, the `SINGLE` build against `tol_real32`, integers and `I` columns exactly). It
+  also feeds each driver the data card exactly as printed in the scan and requires the same trace
+  as the generated card. Fortran cases are marked `fortran` and skipped with the build command
+  when the driver is absent.
+* `python/tests/parity/test_parity.py` (all marked `fortran`; `make test-parity` builds the
+  drivers first) runs, for every entry and preset, the data card and 24 reproducible random input
+  sets within the catalog bounds through both engines and requires the same status (and the same
+  book message), the same rows and iterations, every real within 1e-12 relative, the same book
+  text, and for the data card Python's `book_text(carriage_control=True)` equal to the driver's
+  stdout. In practice the two engines agree bit for bit.
+
 ## Conventions
 
 * Python results are frozen dataclasses with `value`, `converged`, `iterations`, `steps` and a
   `book_text()` method that renders the line-printer output.
 * Every interactive HTML element carries a `data-testid` attribute.
 * Fortran-dependent tests are marked `fortran` and locate the drivers through the
-  `fortran_bin_dir` setting; they are skipped with an explicit reason when the drivers are absent.
+  `fortran_bin_dir` (and `fortran_single_bin_dir`) settings; they are skipped with an explicit
+  reason when the drivers are absent.
 * No absolute paths in code, configuration or tests.

@@ -25,9 +25,11 @@
 !>   11 FX*FX1 = 0        -> status_zero_product_error, iterations = I >= 1 (book message 205)
 !>   12 FX*FX1 > 0        -> X1 = X, FX1 = FX
 !>   loop exhausted       -> status_non_convergent, value = last X (book message 204)
-!>   F returns NaN        -> status_invalid_value (no book equivalent; the original machine
-!>                          had no NaN). Checked after each evaluation of F, before any test:
-!>                          value = the offending X, steps = the rows completed before it.
+!>   F not finite         -> status_invalid_value (NaN or +-Inf, e.g. EXP(-X) overflowing for
+!>                          X < -709 in real64; no book equivalent, the original machine had
+!>                          no IEEE specials). Checked after each evaluation of F, before any
+!>                          test: value = the offending X, steps = the rows completed before
+!>                          it. Same rule as the Python engine (InputError).
 !>
 !> Correction of an original bug: in the scan, label 5 (`PRINT 201, X1`) has no `CALL EXIT`
 !> and falls through to label 4, so F(X1) = 0 with F(X2) /= 0 printed "X1 is a root" and then
@@ -37,7 +39,7 @@
 !> roots; `fx1`/`fx2` in the result let the driver do the same. A NaN product that still
 !> reaches an arithmetic IF (only possible from 0*Inf) takes the positive branch.
 module bisection_mod
-   use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
+   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
    use precision, only: wp
    use functions_mod, only: real_function
    implicit none
@@ -152,13 +154,13 @@ contains
       res%iterations = 0
       allocate (res%steps(0))
 
-      ! F must be a number at both input values (InputError on the Python engine).
-      if (ieee_is_nan(fa)) then
+      ! F must be finite at both input values (InputError on the Python engine).
+      if (.not. ieee_is_finite(fa)) then
          res%status = status_invalid_value
          res%value = a
          return
       end if
-      if (ieee_is_nan(res%fx2)) then
+      if (.not. ieee_is_finite(res%fx2)) then
          res%status = status_invalid_value
          res%value = b
          return
@@ -196,7 +198,7 @@ contains
       do i = 1, limit
          x = (a + b)/2.0_wp
          fx = f(x)
-         if (ieee_is_nan(fx)) then
+         if (.not. ieee_is_finite(fx)) then
             res%status = status_invalid_value
             res%value = x
             res%iterations = i - 1

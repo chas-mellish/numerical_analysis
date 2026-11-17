@@ -16,6 +16,7 @@ from gerald_na.expr import (
     MAX_SOURCE_LENGTH,
     CompiledExpr,
     compile_expr,
+    powi,
 )
 
 BOOK_F = "EXPF(-X) - SINF(3.1415926*X/2.)"
@@ -332,3 +333,46 @@ def test_arbitrary_text_never_escapes(source: str) -> None:
     except ExpressionError:
         return
     assert isinstance(f, CompiledExpr)
+
+
+# ---------------------------------------------------------------- Fortran integer powers
+
+
+@pytest.mark.parametrize("x", [1.3247179572447458, 1.1, -0.7, 3.0000001, 1e-3])
+def test_integer_literal_exponents_multiply_like_fortran(x: float) -> None:
+    assert compile_expr("x**2")(x) == x * x
+    assert compile_expr("x**3")(x) == (x * x) * x
+    assert compile_expr("x**4")(x) == (x * x) * (x * x)
+    assert compile_expr("x**-2")(x) == 1.0 / (x * x)
+    assert compile_expr("x**+3")(x) == (x * x) * x
+    # a real exponent is a real power, exactly like X**3. in Fortran
+    assert compile_expr("x**3.")(x) == math.pow(x, 3.0)
+
+
+def test_integer_power_differs_from_pow_somewhere() -> None:
+    """Why the distinction matters: x**3 by multiplication is not always pow(x, 3)."""
+    xs = [1.0 + i * 1e-3 for i in range(1, 2000)]
+    assert any((x * x) * x != math.pow(x, 3.0) for x in xs)
+
+
+@pytest.mark.parametrize("n", [0, 1, 2, 3, 5, 7, 8, 13, 64, -1, -3, 1000])
+def test_powi_matches_square_and_multiply(n: int) -> None:
+    x = 1.0001
+    assert powi(x, n) == pytest.approx(x**n, rel=1e-12)
+    assert powi(2.0, n) == 2.0**n
+    assert powi(0.0, 0) == 1.0
+
+
+def test_integer_exponents_stay_integers_when_normalized() -> None:
+    f = compile_expr("X**3 - X - 1")
+    assert f.normalized == "x ** 3 - x - 1.0"
+    assert compile_expr("x**(-2)").normalized == "x ** (-2)"
+    assert compile_expr("x**2.").normalized == "x ** 2.0"
+    assert compile_expr(f.normalized)(1.1) == f(1.1)
+
+
+def test_integer_power_errors() -> None:
+    with pytest.raises(ExpressionError, match=r"overflow in \(1e\+200\)\*\*\(3\.0\)"):
+        compile_expr("x**3")(1e200)
+    with pytest.raises(ExpressionError, match=r"\(0\.0\)\*\*\(-2\.0\) is undefined"):
+        compile_expr("x**-2")(0.0)

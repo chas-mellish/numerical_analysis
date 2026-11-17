@@ -83,6 +83,10 @@ class Settings(BaseSettings):
         default=Path("build/bin"),
         description="Directory of the compiled Fortran drivers (relative to repo_root).",
     )
+    fortran_single_bin_dir: Path = Field(
+        default=Path("build/single/bin"),
+        description="Directory of the SINGLE (real32) drivers, `make build-fortran-single`.",
+    )
     run_timeout_s: float = Field(
         default=5.0, gt=0, description="Timeout in seconds for one Fortran driver run."
     )
@@ -119,6 +123,11 @@ class Settings(BaseSettings):
     def fortran_bin_path(self) -> Path:
         """Absolute directory of the compiled Fortran drivers."""
         return self.resolve_path(self.fortran_bin_dir)
+
+    @property
+    def fortran_single_bin_path(self) -> Path:
+        """Absolute directory of the SINGLE-precision (real32) Fortran drivers."""
+        return self.resolve_path(self.fortran_single_bin_dir)
 
     def fortran_executables(self) -> list[str]:
         """Names of the Fortran drivers currently present in :attr:`fortran_bin_path`."""

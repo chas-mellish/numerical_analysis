@@ -18,6 +18,7 @@ from gerald_na.expr._compiler import (
     VARIABLE,
     CompiledExpr,
     compile_expr,
+    powi,
 )
 
 __all__ = [
@@ -31,4 +32,5 @@ __all__ = [
     "CompiledExpr",
     "ExpressionError",
     "compile_expr",
+    "powi",
 ]

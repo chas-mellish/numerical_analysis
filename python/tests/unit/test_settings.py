@@ -30,6 +30,7 @@ def test_repository_settings_file_matches_documented_defaults(
     assert settings.config_file.is_file()
     assert settings.fortran_bin_dir == Path("build/bin")
     assert settings.fortran_bin_path == repo_root / "build" / "bin"
+    assert settings.fortran_single_bin_path == repo_root / "build" / "single" / "bin"
     assert settings.run_timeout_s == 5.0
     assert settings.engines_enabled == ("python", "fortran")
     assert settings.host == "127.0.0.1"

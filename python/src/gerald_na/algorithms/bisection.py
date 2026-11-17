@@ -188,8 +188,8 @@ class BisectionResult:
 
 def _evaluate(f: Callable[[float], float], x: float) -> float:
     value = float(f(x))
-    if math.isnan(value):
-        raise InputError(f"F(X) is not a number at X = {x!r}")
+    if not math.isfinite(value):
+        raise InputError(f"F(X) is not a finite number at X = {x!r}")
     return value
 
 
@@ -218,9 +218,13 @@ def bisection(
             loop case carries the steps computed so far in ``steps``.
         NonConvergenceError: ``max_iter`` halvings did not meet ``tol`` (format 204); carries
             all steps in ``steps``.
-        InputError: ``max_iter`` is negative, or ``f`` returned NaN.
+        InputError: ``max_iter`` is negative, or ``f`` returned NaN or an infinity (the Fortran
+            drivers report the same ``INPUT`` error). Errors raised by ``f`` itself (for example
+            :class:`~gerald_na.errors.ExpressionError` from a learner function) propagate with
+            their class kept. Inside the loop either carries the rows completed so far in
+            ``steps``, and ``book_output`` holds their lines (the book has no message for it).
 
-    Every error carries the book's output up to the failure in ``book_output``.
+    Every book error carries the book's output up to the failure in ``book_output``.
     """
     if isinstance(max_iter, bool) or not isinstance(max_iter, int) or max_iter < 0:
         raise InputError(f"max_iter must be a non-negative integer, got {max_iter!r}")
@@ -256,7 +260,16 @@ def bisection(
     steps: list[BisectionStep] = []
     for i in range(1, max_iter + 1):
         x = (x1 + x2) / 2.0
-        fx = _evaluate(f, x)
+        try:
+            fx = _evaluate(f, x)
+        except InputError as exc:
+            # Keep the error's class (a learner function raises ExpressionError) and attach the
+            # rows completed so far, like the Fortran trace (STEP records before the ERROR).
+            exc.steps = tuple(steps)
+            exc.book_output = _render(
+                [_fmt_step(step.x, step.fx, _ROUNDING) for step in steps], carriage_control=False
+            )
+            raise
         steps.append(BisectionStep(k=i, x1=x1, x2=x2, x=x, fx=fx))
         # IF (ABSF(FX) - TOL) 8, 8, 9
         if abs(fx) - tol <= 0.0:

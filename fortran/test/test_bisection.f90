@@ -4,7 +4,7 @@
 !> arithmetic IFs including the exact-zero and underflow cases, non-convergence and
 !> the optional iteration limit.
 module test_bisection_suite
-   use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
+   use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_positive_inf
    use precision, only: wp, single_precision
    use functions_mod, only: real_function, f_book_bisection, get_bisection_preset, &
       preset_expr_len
@@ -57,6 +57,7 @@ contains
          new_unittest("non_convergent_max_iter", test_non_convergent_max_iter), &
          new_unittest("nan_at_endpoint_is_invalid", test_nan_endpoint), &
          new_unittest("nan_at_midpoint_is_invalid", test_nan_midpoint), &
+         new_unittest("infinity_is_invalid", test_infinite_values), &
          new_unittest("arith_if_branches", test_arith_if), &
          new_unittest("status_names", test_status_names), &
          new_unittest("preset_2_and_3", test_presets) &
@@ -145,6 +146,30 @@ contains
          y = -1.0_wp
       end if
    end function f_nan_at_zero
+
+   !> +Inf for X < 0, else X - 0.3.
+   pure function f_inf_below_zero(x) result(y)
+      real(wp), intent(in) :: x
+      real(wp) :: y
+      if (x < 0.0_wp) then
+         y = ieee_value(1.0_wp, ieee_positive_inf)
+      else
+         y = x - 0.3_wp
+      end if
+   end function f_inf_below_zero
+
+   !> -1 for X <= 0.25, +Inf on (0.25, 0.75), 1 above: brackets [-1,1], Inf at the midpoint 0.5.
+   pure function f_inf_above_quarter(x) result(y)
+      real(wp), intent(in) :: x
+      real(wp) :: y
+      if (x <= 0.25_wp) then
+         y = -1.0_wp
+      else if (x < 0.75_wp) then
+         y = ieee_value(1.0_wp, ieee_positive_inf)
+      else
+         y = 1.0_wp
+      end if
+   end function f_inf_above_quarter
 
    !> Brackets [0,1] (F(0) = -1, F(1) = 1) but is NaN on [0.3,0.4], hit at the 3rd midpoint.
    pure function f_nan_inside(x) result(y)
@@ -514,6 +539,23 @@ contains
       if (allocated(error)) return
       call check(error, same(res%value, 0.375_wp), "value must be the NaN midpoint")
    end subroutine test_nan_midpoint
+
+   !> +Inf at X1 (like EXP(-X) overflowing for X < -709) and at the 2nd midpoint: INPUT error.
+   subroutine test_infinite_values(error)
+      type(error_type), allocatable, intent(out) :: error
+      type(bisection_result) :: res
+
+      res = bisection(f_inf_below_zero, -1.0_wp, 1.0_wp, 1.0e-5_wp)
+      call check_outcome(error, res, status_invalid_value, .false., 0)
+      if (allocated(error)) return
+      call check(error, same(res%value, -1.0_wp), "value must be the offending X")
+      if (allocated(error)) return
+      ! midpoints 0 (F = -1, so X1 = 0) then 0.5: F(0.5) = +Inf after one completed row
+      res = bisection(f_inf_above_quarter, -1.0_wp, 1.0_wp, 1.0e-5_wp)
+      call check_outcome(error, res, status_invalid_value, .false., 1)
+      if (allocated(error)) return
+      call check(error, same(res%value, 0.5_wp), "value must be the infinite midpoint")
+   end subroutine test_infinite_values
 
    ! ---------------------------------------------------------------------------------------
    ! Helpers of the module

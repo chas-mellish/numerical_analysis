@@ -5,6 +5,9 @@
 
 # Directory holding the compiled Fortran drivers (`make build-fortran` installs them here).
 fortran_bin_dir = "build/bin"
+# SINGLE-precision (real32) drivers (`make build-fortran-single`), used by the golden tests to
+# compare against the book's digits.
+fortran_single_bin_dir = "build/single/bin"
 # Wall-clock limit, in seconds, for one Fortran driver run.
 run_timeout_s = 5.0
 # Engines offered by the UI and API.

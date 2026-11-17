@@ -18,6 +18,7 @@ from gerald_na.algorithms.bisection import (
 )
 from gerald_na.errors import (
     BracketError,
+    ExpressionError,
     InputError,
     NonConvergenceError,
     ZeroProductError,
@@ -287,13 +288,37 @@ def test_invalid_max_iter(max_iter: object) -> None:
         bisection(book_f, 0.0, 1.0, 1e-5, max_iter=max_iter)  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize("bad_value", [math.nan, math.inf, -math.inf])
 @pytest.mark.parametrize("bad_x", [0.0, 0.5])
-def test_nan_function_values_are_rejected(bad_x: float) -> None:
+def test_non_finite_function_values_are_rejected(bad_x: float, bad_value: float) -> None:
     def f(x: float) -> float:
-        return math.nan if x == bad_x else x - 0.3
+        return bad_value if x == bad_x else x - 0.3
 
-    with pytest.raises(InputError, match="not a number"):
+    with pytest.raises(InputError, match="not a finite number") as info:
         bisection(f, 0.0, 1.0, 1e-9)
+    assert type(info.value) is InputError
+    assert info.value.steps == ()
+
+
+def test_non_finite_value_inside_the_loop_keeps_completed_rows() -> None:
+    def f(x: float) -> float:
+        return math.inf if x == 0.375 else x - 0.35
+
+    with pytest.raises(InputError, match=r"at X = 0\.375") as info:
+        bisection(f, 0.0, 1.0, 1e-9)
+    steps = [step for step in info.value.steps if isinstance(step, BisectionStep)]
+    assert [step.x for step in steps] == [0.5, 0.25]
+    assert len(steps) == len(info.value.steps)
+    assert info.value.book_output is not None
+    assert info.value.book_output.splitlines() == [step.book_line() for step in steps]
+
+
+def test_errors_raised_by_the_function_keep_their_class() -> None:
+    f = compile_expr("1/(x - 0.75)")
+
+    with pytest.raises(ExpressionError) as info:
+        bisection(f, 0.0, 1.0, 1e-9)
+    assert len(info.value.steps) == 1
 
 
 def test_reversed_bracket_and_integer_inputs() -> None:

@@ -131,6 +131,8 @@ step_columns = [
 records = []
 result_extras = [
     { key = "root_at_endpoint", type = "bool", description = "X1 or X2 is already a root (iterations = 0, book FORMAT 201)." },
+    { key = "fx1", type = "real", description = "F(X1) at the data card's X1 (selects which input value FORMAT 201 reports)." },
+    { key = "fx2", type = "real", description = "F(X2) at the data card's X2." },
 ]
 
 # ------------------------------------------------------------------ golden expectations (DD4)

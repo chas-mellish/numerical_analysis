@@ -17,6 +17,10 @@ Limits guard against denial of service: the source length, the number of AST nod
 magnitude of constant exponents (``9**9**9`` is rejected before anything is computed). At run
 time every operation goes through ``math``; domain errors, overflow, division by zero and
 non-finite results raise :class:`~gerald_na.errors.ExpressionError`.
+
+As in Fortran, an integer literal exponent (``X**3``) is an integer power computed by repeated
+multiplication (:func:`powi`), while a real exponent (``X**3.``, ``X**0.5``) uses ``pow``. Both
+are exact to within an ulp, but only the former matches the compiled Fortran presets bit for bit.
 """
 
 import ast
@@ -38,6 +42,7 @@ __all__ = [
     "VARIABLE",
     "CompiledExpr",
     "compile_expr",
+    "powi",
 ]
 
 MAX_SOURCE_LENGTH: Final = 500
@@ -206,6 +211,70 @@ def _eval_error(message: str) -> ExpressionError:
     return ExpressionError(message)
 
 
+def _integer_literal(node: ast.expr) -> int | None:
+    """The value of an integer literal exponent (``3``, ``-2``, ``+2``), else ``None``.
+
+    Fortran distinguishes ``X**3`` (integer power, evaluated by multiplication) from ``X**3.``
+    (real power, ``pow``); Python's syntax tree keeps the same distinction.
+    """
+    match node:
+        case ast.Constant(value=bool()):
+            return None
+        case ast.Constant(value=int() as value):
+            return value
+        case ast.UnaryOp(op=ast.USub(), operand=ast.Constant(value=int() as value)) if not (
+            isinstance(value, bool)
+        ):
+            return -value
+        case ast.UnaryOp(op=ast.UAdd(), operand=ast.Constant(value=int() as value)) if not (
+            isinstance(value, bool)
+        ):
+            return value
+    return None
+
+
+def _integer_constant(value: int) -> ast.expr:
+    if value < 0:
+        return ast.UnaryOp(op=ast.USub(), operand=ast.Constant(value=-value))
+    return ast.Constant(value=value)
+
+
+def powi(base: float, exponent: int) -> float:
+    """``base**exponent`` for an integer exponent, multiplied out as Fortran does.
+
+    Square-and-multiply in the order of libgcc's ``__powidf2``, which gfortran uses for
+    ``X**N`` with an integer ``N``; for ``|N| <= 4`` gfortran's inlined multiplication chains
+    give the same products, so the Python and Fortran engines agree bit for bit on presets such
+    as ``X**3 - X - 1``. Overflow yields an infinity (checked by the caller); a negative
+    exponent of zero raises :class:`ZeroDivisionError`.
+    """
+    n = abs(exponent)
+    result = base if n % 2 else 1.0
+    n >>= 1
+    while n:
+        base *= base
+        if n % 2:
+            result *= base
+        n >>= 1
+    return 1.0 / result if exponent < 0 else result
+
+
+def _integer_power(lhs: _Fn, exponent: int) -> _Fn:
+    def integer_power(x: float) -> float:
+        base = lhs(x)
+        try:
+            value = powi(base, exponent)
+        except ZeroDivisionError:
+            raise _eval_error(
+                f"({base!r})**({float(exponent)!r}) is undefined (at x = {x!r})"
+            ) from None
+        if not math.isfinite(value) and math.isfinite(base):
+            raise _eval_error(f"overflow in ({base!r})**({float(exponent)!r}) at x = {x!r}")
+        return value
+
+    return integer_power
+
+
 class _Compiler:
     """Validate an :mod:`ast` tree and build the closure that evaluates it."""
 
@@ -292,6 +361,9 @@ class _Compiler:
             raise _error(hint, self.source, node)
         lhs, left_canonical = self.compile(left)
         rhs, right_canonical = self.compile(right)
+        integer_exponent = _integer_literal(right) if symbol == "**" else None
+        if integer_exponent is not None:
+            right_canonical = _integer_constant(integer_exponent)
         canonical = ast.BinOp(left=left_canonical, op=type(op)(), right=right_canonical)
         match symbol:
             case "+":
@@ -323,6 +395,8 @@ class _Compiler:
                 return divide, canonical
             case _:
                 self._check_constant_exponent(right, rhs)
+                if integer_exponent is not None:
+                    return _integer_power(lhs, integer_exponent), canonical
 
                 def power(x: float) -> float:
                     base, exponent = lhs(x), rhs(x)

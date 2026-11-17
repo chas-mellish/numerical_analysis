@@ -30,11 +30,12 @@
 !   (non-numeric card, unknown flag, unknown preset) prints a message on stderr
 !   and exits 1. With --trace (protocol DD2, docs/architecture.md):
 !     STEP,k=<I0>,x1=<r>,x2=<r>,x=<r>,fx=<r>      one per iteration row
-!     RESULT,value=<r>,converged=T,iterations=<I0>,root_at_endpoint=<T|F>
+!     RESULT,value=<r>,converged=T,iterations=<I0>,root_at_endpoint=<T|F>,
+!            fx1=<r>,fx2=<r>                      F(X1), F(X2) of the data card
 !     ERROR,code=<BRACKET|ZERO_PRODUCT|NON_CONVERGENT|INPUT>,message=<text>
 !   reals as ES25.17E3 without leading blanks; on ERROR the exit status is 2.
 !   ZERO_PRODUCT carries the book's message (202 before the loop, "ERROR." for
-!   label 11); INPUT also covers a NaN function value.
+!   label 11); INPUT also covers a NaN or infinite function value.
 !
 ! TRANSCRIPTION OF THE SCAN
 ! -------------------------
@@ -200,7 +201,9 @@
 !     procedure argument (--preset N); EXPF/SINF/ABSF became EXP/SIN/ABS;
 !     every zero branch is kept. See D.
 !   Not a catalog id: the label-5 fall-through bug of the original (C) and
-!   NaN function values. F returning NaN (impossible on the original machine)
+!   non-finite function values. F returning NaN or +-Inf (for example
+!   EXP(-X) overflowing for X < -709 in real64, X < -88 in real32; impossible
+!   as IEEE specials on the original machine)
 !   stops the run as an INPUT error (ERROR,code=INPUT in trace mode, a message
 !   on stderr and exit 1 otherwise), matching InputError on the Python engine.
 !===============================================================================
@@ -403,12 +406,12 @@ contains
       end select
    end subroutine write_book_text
 
-   !> Message for a NaN function value (INPUT error; InputError on the Python engine).
+   !> Message for a NaN or infinite function value (INPUT error; InputError on the Python engine).
    function nan_message(res) result(message)
       type(bisection_result), intent(in) :: res
       character(len=:), allocatable :: message
 
-      message = "F(X) is not a number at X = " // trace_real(res%value)
+      message = "F(X) is not a finite number at X = " // trace_real(res%value)
    end function nan_message
 
    !> FORMAT 201.
@@ -444,7 +447,8 @@ contains
          write (output_unit, '(a)') "RESULT,value=" // trace_real(res%value) // &
             ",converged=" // trace_logical(res%converged) // &
             ",iterations=" // trace_int(res%iterations) // &
-            ",root_at_endpoint=" // trace_logical(res%status == status_root_at_endpoint)
+            ",root_at_endpoint=" // trace_logical(res%status == status_root_at_endpoint) // &
+            ",fx1=" // trace_real(res%fx1) // ",fx2=" // trace_real(res%fx2)
       case (status_bracket_error)
          write (output_unit, '(a)') "ERROR,code=BRACKET,message=" // trim(adjustl(msg_200))
       case (status_zero_product_error)
