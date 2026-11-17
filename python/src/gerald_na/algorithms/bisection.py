@@ -41,9 +41,9 @@ rewrite is not followed):
   ``F6.3`` edit descriptor of format 201 (the rewrite uses ``F10.7``) are restored.
 * Genuine bug in the original (catalog erratum ``label-5-fall-through``): label 5 has no
   ``CALL EXIT``, so when X1 is a root and X2 is not, control falls through to label 4 and then
-  to 6, printing the ``ERROR. FX1 AND FX2 NOT ZERO`` message after the root message. The port stops after reporting the root(s): the result is a
-  root at X1, and the book text shows format 201 for X1 (and for X2 as well when both are roots,
-  which the original prints correctly).
+  to 6, printing the ``ERROR. FX1 AND FX2 NOT ZERO`` message after the root message. The port
+  stops after reporting the root(s): the result is a root at X1, and the book text shows format
+  201 for X1 (and for X2 as well when both are roots, which the original prints correctly).
 * The book's output was printed by a processor that truncates on output (the exact midpoint
   0.443572998046875 appears as ``.4435729``, 0.443359375 as ``.4433593``); :meth:`book_text`
   therefore renders with ``RZ`` rounding and without the optional leading zero.

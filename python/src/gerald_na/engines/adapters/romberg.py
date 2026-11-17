@@ -54,7 +54,7 @@ class RombergAdapter(BookSeededIntegrandAdapter):
         if function is None:
             raise TypeError("romberg needs a function")
         return romberg(
-            function,
+            self.integrand(entry, function),
             real_input(inputs, "b"),
             real_input(inputs, "tol"),
             f0=self.seed(entry, function),

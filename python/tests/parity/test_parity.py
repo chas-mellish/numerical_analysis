@@ -296,3 +296,16 @@ def test_lagrange_random_inputs_cover_both_outcomes() -> None:
     statuses = {outcome.status for outcome in outcomes}
     assert statuses == {"OK", "INPUT"}, statuses
     assert {outcome.inputs["n"] for outcome in outcomes} >= {1, 10}
+
+
+@pytest.mark.fortran
+def test_book_integrand_at_zero_upper_limit_agrees(fortran: FortranRunner) -> None:
+    """Simpson's book preset with B = 0: every ordinate is the X = 0 limit 1 on both engines."""
+    entry = get_registry().get("ch03_p01")
+    if not fortran.is_available(entry):
+        pytest.skip(f"{entry.files.fortran_executable} not built: run `make build-fortran`")
+    request = RunRequest.for_entry(entry, {"b": 0.0, "n": 100})
+    py = PythonEngine().run(entry, request)
+    ft = fortran.run(entry, request)
+    assert py.ok, py.error
+    assert_parity(entry, py, ft)

@@ -43,7 +43,7 @@ class SimpsonAdapter(BookSeededIntegrandAdapter):
         if function is None:
             raise TypeError("simpson needs a function")
         return simpson(
-            function,
+            self.integrand(entry, function),
             real_input(inputs, "b"),
             int_input(inputs, "n"),
             f0=self.seed(entry, function),

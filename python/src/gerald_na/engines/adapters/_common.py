@@ -26,6 +26,7 @@ from gerald_na.registry.models import InputValue
 
 __all__ = [
     "BookSeededIntegrandAdapter",
+    "book_integrand",
     "book_seed_for",
     "int_input",
     "is_book_function",
@@ -75,6 +76,20 @@ def book_seed_for(entry: CatalogEntry, function: Function, seed: float) -> float
     return seed if is_book_function(entry, function) else None
 
 
+def book_integrand(entry: CatalogEntry, function: Function, seed: float) -> Function:
+    """The function the algorithm calls: the book's integrand gives ``seed`` at X = 0.
+
+    Any other function is returned unchanged.
+    """
+    if book_seed_for(entry, function, seed) is None:
+        return function
+
+    def seeded(x: float) -> float:
+        return seed if x == 0.0 else function(x)
+
+    return seeded
+
+
 class BookSeededIntegrandAdapter(ProgramAdapter):
     """Adapter base for integration programs whose sum starts with the book's F(0) literal."""
 
@@ -84,6 +99,10 @@ class BookSeededIntegrandAdapter(ProgramAdapter):
     def seed(self, entry: CatalogEntry, function: Function) -> float | None:
         """The ``f0`` to pass to the algorithm (see :func:`book_seed_for`)."""
         return book_seed_for(entry, function, self.book_seed)
+
+    def integrand(self, entry: CatalogEntry, function: Function) -> Function:
+        """The function to integrate (see :func:`book_integrand`)."""
+        return book_integrand(entry, function, self.book_seed)
 
     def substituted_ordinates(self, entry: CatalogEntry, function: Function) -> dict[float, float]:
         seed = self.seed(entry, function)

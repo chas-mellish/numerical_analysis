@@ -314,6 +314,17 @@ def test_adapter_substitutes_the_seed_for_the_chart(entry: CatalogEntry) -> None
     assert adapter.substituted_ordinates(entry, compile_expr("EXP(-X**2)")) == {}
 
 
+def test_book_integrand_at_zero_upper_limit(entry: CatalogEntry) -> None:
+    """B = 0 puts every ordinate at X = 0: the book's integrand is 1 there, as in f_sinc."""
+    outcome = PythonEngine().run(entry, RunRequest.for_entry(entry, {"b": 0.0, "n": 100}))
+    assert outcome.ok, outcome.error
+    assert isinstance(outcome.result, SimpsonResult)
+    assert outcome.result.value == 0.0
+    assert all(step.fx == BOOK_SEED for step in outcome.result.steps)
+    custom = RunRequest.for_entry(entry, {"b": 0.0, "n": 100}, expression="EXP(-X)/X")
+    assert not PythonEngine().run(entry, custom).ok
+
+
 def test_python_engine_runs_the_book_card(entry: CatalogEntry) -> None:
     outcome = PythonEngine().run(entry, RunRequest.for_entry(entry, {}))
     assert outcome.ok, outcome.error
