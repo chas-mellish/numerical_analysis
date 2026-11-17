@@ -443,3 +443,17 @@ def test_driver_flags(fortran_executable: Callable[[str], Path]) -> None:
     assert verbose.returncode == 0
     assert "VERBOSE OUTPUT" in verbose.stdout
     assert "VALUE = 3.00000000000000000E+000" in verbose.stdout
+
+
+def test_python_engine_verbose_text_on_the_book_card(entry: CatalogEntry) -> None:
+    """The driver's ``--verbose`` extras (compared with the driver in ``tests/parity``)."""
+    outcome = PythonEngine().run(entry, RunRequest.for_entry(entry, verbose=True))
+    lines = outcome.verbose_text.splitlines()
+    assert lines[:4] == [
+        "VERBOSE OUTPUT (NOT PART OF THE BOOK TEXT)",
+        "WORKING PRECISION: REAL64",
+        "DATA CARD: N = 5  XIN = 5.00000000000000000E+000",
+        "TERM(I) = Y(I) * PRODUCT OVER J /= I OF (XIN - X(J))/(X(I) - X(J));  YOUT = RUNNING SUM",
+    ]
+    assert lines[4].startswith("I =  1  X = 2.37559999999999993E+000  Y = 1.60000000000000009E+000")
+    assert lines[-1] == "VALUE = 2.31190129017843660E+000  (5 TERMS)"

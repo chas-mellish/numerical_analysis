@@ -13,7 +13,8 @@ card, XIN on the last card; reals with ``repr`` precision. Trace
     STEP,i=<int>,x=<r>,y=<r>,term=<r>,partial=<r>
     RESULT,value=<r>,converged=T,iterations=<n>
 
-``n``, ``xs``, ``ys`` and ``xin`` of the result are the request's inputs.
+``n``, ``xs``, ``ys`` and ``xin`` of the result are the request's inputs. ``verbose_text``
+reproduces the driver's ``write_verbose`` (every term and running sum at full precision).
 """
 
 import random
@@ -21,8 +22,9 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any, ClassVar
 
+from gerald_na.algorithms._fortran_format import format_i, render_records
 from gerald_na.algorithms.lagrange import LagrangeResult, LagrangeStep, lagrange
-from gerald_na.engines.adapters._common import int_input, real_input
+from gerald_na.engines.adapters._common import int_input, real_input, trace_real, verbose_header
 from gerald_na.engines.programs import Function, ProgramAdapter, card_number
 from gerald_na.engines.trace import Trace
 from gerald_na.errors import FortranRunError
@@ -142,3 +144,27 @@ class LagrangeAdapter(ProgramAdapter):
             ys=tuple(y for _, y in points),
             xin=real_input(inputs, "xin"),
         )
+
+    def verbose_text(
+        self,
+        entry: CatalogEntry,
+        inputs: Mapping[str, InputValue],
+        result: LagrangeResult,
+        *,
+        preset: int | None = None,
+        function: Function | None = None,
+    ) -> str:
+        """The driver's ``--verbose`` extras (data only: no function line)."""
+        records = verbose_header(entry, None, None)
+        records.append(f" DATA CARD: N = {result.n}  XIN = {trace_real(result.xin)}")
+        records.append(
+            " TERM(I) = Y(I) * PRODUCT OVER J /= I OF (XIN - X(J))/(X(I) - X(J));"
+            "  YOUT = RUNNING SUM"
+        )
+        records.extend(
+            f" I = {format_i(step.i, 2)}  X = {trace_real(step.x)}  Y = {trace_real(step.y)}"
+            f"  TERM = {trace_real(step.term)}  YOUT = {trace_real(step.partial)}"
+            for step in result.steps
+        )
+        records.append(f" VALUE = {trace_real(result.value)}  ({result.iterations} TERMS)")
+        return render_records(records, carriage_control=False)

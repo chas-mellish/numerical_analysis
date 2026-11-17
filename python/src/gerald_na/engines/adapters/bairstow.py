@@ -146,7 +146,13 @@ class BairstowAdapter(ProgramAdapter):
         )
 
     def verbose_text(
-        self, entry: CatalogEntry, inputs: Mapping[str, InputValue], result: BairstowResult
+        self,
+        entry: CatalogEntry,
+        inputs: Mapping[str, InputValue],
+        result: BairstowResult,
+        *,
+        preset: int | None = None,
+        function: Function | None = None,
     ) -> str:
         """The same extras as the driver's ``--verbose`` (true factors and roots)."""
         return result.verbose_text()

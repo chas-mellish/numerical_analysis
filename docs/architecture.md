@@ -505,7 +505,11 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
    * optionally override `data_card(entry, inputs)` when the driver's `READ` statements need a
      layout other than the generic one (one line per catalog `card`, numbers with `repr`
      precision, every `point_list` pair on its own line), `steps_from_trace` when the `STEP`
-     records are not one flat list, and `verbose_text` for Python-side extras.
+     records are not one flat list, and `verbose_text(entry, inputs, result, *, preset,
+     function)` when the driver prints `--verbose` extras: it must return the same text as the
+     driver (real64 build; `trace_real`, `trace_logical` and `verbose_header` in `_common`
+     reproduce `book_format_mod` and the common first records). Bisection, Bairstow, Simpson,
+     Romberg and Lagrange all do.
 3. Import it in `gerald_na/engines/adapters/__init__.py` and add an instance to `_BUILTIN`.
 4. Run the tests: the golden tests, the parity tests and `test_every_catalog_entry_has_an_adapter`
    pick the new catalog entry up automatically. If the program's inputs constrain each other

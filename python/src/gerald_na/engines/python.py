@@ -83,7 +83,11 @@ class PythonEngine(Engine):
                 elapsed_ms=elapsed_ms,
             )
         adapter.check_result_type(result)
-        verbose = adapter.verbose_text(entry, inputs, result) if request.verbose else ""
+        verbose = (
+            adapter.verbose_text(entry, inputs, result, preset=preset_id, function=function)
+            if request.verbose
+            else ""
+        )
         return RunOutcome(
             engine=self.name,
             program_id=entry.id,

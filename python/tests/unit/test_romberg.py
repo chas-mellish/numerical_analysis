@@ -579,3 +579,30 @@ def test_catalog_entry_matches_the_book(entry: CatalogEntry) -> None:
     ]
     assert [extra.key for extra in entry.trace.result_extras] == ["subintervals"]
     assert entry.chart.kind == "romberg_heatmap"
+
+
+def test_python_engine_verbose_text_on_the_book_card(entry: CatalogEntry) -> None:
+    """The driver's ``--verbose`` extras (compared with the driver in ``tests/parity``)."""
+    outcome = PythonEngine().run(entry, RunRequest.for_entry(entry, verbose=True))
+    lines = outcome.verbose_text.splitlines()
+    assert lines[:6] == [
+        "VERBOSE OUTPUT (NOT PART OF THE BOOK TEXT)",
+        "PRESET 1: F(X) = SIN(X)/X ON [0, B]",
+        "WORKING PRECISION: REAL64",
+        "DATA CARD: B = 1.50000000000000000E+001  TOL = 1.99999999999999991E-007",
+        "SEED F(0) + F(B) = 1.00000000000000000E+000 + 4.33525226771411185E-002"
+        "  (THE BOOK USES 1. + FCN(B))",
+        "TABLE TRAP(ROW, COL), ROW = EXTRAPOLATION ORDER, COL = 10*2**(COL-1) SUBINTERVALS:",
+    ]
+    assert lines[6] == "  TRAP(1,1) = 1.60772548822379546E+000"
+    assert lines[-2] == "VALUE = 1.61819444404094326E+000  CONVERGED = T"
+    assert lines[-1] == "HALVINGS = 3 OF 8  SUBINTERVALS = 80  FUNCTION EVALUATIONS = 81"
+
+
+def test_python_engine_verbose_text_when_the_table_fills(entry: CatalogEntry) -> None:
+    request = RunRequest.for_entry(entry, {"b": 100.0, "tol": 1.0e-14}, preset=2, verbose=True)
+    lines = PythonEngine().run(entry, request).verbose_text.splitlines()
+    assert lines[-2:] == [
+        "HALVINGS = 8 OF 8  SUBINTERVALS = 2560  FUNCTION EVALUATIONS = 2561",
+        "THE TABLE IS FULL (9x9): TOL WAS NOT MET AFTER 8 EXTRAPOLATIONS",
+    ]

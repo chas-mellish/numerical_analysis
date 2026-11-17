@@ -5,7 +5,8 @@ Data card ``B N`` (generic serialization). Trace (``fortran/app/ch03_p01_simpson
     STEP,k=<int>,x=<r>,fx=<r>,weight=<r>          one per ordinate, k = 0..N
     RESULT,value=<r>,converged=T,iterations=<int>,delx=<r>,sum=<r>
 
-``b`` and ``n`` of the result are the request's inputs.
+``b`` and ``n`` of the result are the request's inputs. ``verbose_text`` reproduces the
+driver's ``write_verbose`` (DELX, the weighted sum, the integral and the ordinate count).
 
 The seed of the sum: the book writes ``SUM = 1.0 + ...`` because its integrand ``SIN(X)/X``
 cannot be evaluated at X = 0. The shared base class
@@ -18,8 +19,15 @@ Romberg adapter); every other function supplies its own ordinate ``f(0)``.
 from collections.abc import Mapping
 from typing import ClassVar
 
+from gerald_na.algorithms._fortran_format import render_records
 from gerald_na.algorithms.simpson import BOOK_SEED, SimpsonResult, SimpsonStep, simpson
-from gerald_na.engines.adapters._common import BookSeededIntegrandAdapter, int_input, real_input
+from gerald_na.engines.adapters._common import (
+    BookSeededIntegrandAdapter,
+    int_input,
+    real_input,
+    trace_real,
+    verbose_header,
+)
 from gerald_na.engines.programs import Function
 from gerald_na.engines.trace import Trace
 from gerald_na.errors import FortranRunError
@@ -76,3 +84,21 @@ class SimpsonAdapter(BookSeededIntegrandAdapter):
             delx=record.real("delx"),
             sum=record.real("sum"),
         )
+
+    def verbose_text(
+        self,
+        entry: CatalogEntry,
+        inputs: Mapping[str, InputValue],
+        result: SimpsonResult,
+        *,
+        preset: int | None = None,
+        function: Function | None = None,
+    ) -> str:
+        """The driver's ``--verbose`` extras."""
+        records = verbose_header(entry, preset, function)
+        records.append(f" DATA CARD: B = {trace_real(result.b)}  N = {result.n}")
+        records.append(f" DELX = B/N = {trace_real(result.delx)}")
+        records.append(f" SUM OF WEIGHTED ORDINATES = {trace_real(result.sum)}")
+        records.append(f" INTEGRAL = DELX/3*SUM = {trace_real(result.value)}")
+        records.append(f" ORDINATES EVALUATED = {result.iterations}")
+        return render_records(records, carriage_control=False)

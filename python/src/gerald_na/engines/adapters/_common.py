@@ -13,12 +13,16 @@
 * :class:`BookSeededIntegrandAdapter`: the base class of those two adapters, which also reports
   the seed through :meth:`~gerald_na.engines.programs.ProgramAdapter.substituted_ordinates` so
   the web chart draws F(0) the way the program uses it.
+* :func:`trace_real` / :func:`trace_logical` / :func:`verbose_header`: the pieces of the drivers'
+  ``--verbose`` extras (``book_format_mod`` and the common first records of ``write_verbose``),
+  so the adapters' ``verbose_text`` reproduces them character for character (real64 build).
 """
 
 from collections.abc import Mapping
 from functools import lru_cache
 from typing import ClassVar
 
+from gerald_na.algorithms import format_es
 from gerald_na.engines.programs import Function, ProgramAdapter
 from gerald_na.expr import CompiledExpr, compile_expr
 from gerald_na.registry import CatalogEntry
@@ -31,6 +35,9 @@ __all__ = [
     "int_input",
     "is_book_function",
     "real_input",
+    "trace_logical",
+    "trace_real",
+    "verbose_header",
 ]
 
 
@@ -48,6 +55,41 @@ def int_input(inputs: Mapping[str, InputValue], name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise TypeError(f"input {name!r} must be an integer, got {value!r}")
     return value
+
+
+def trace_real(x: float) -> str:
+    """``book_format_mod: trace_real``: ``ES25.17E3`` with the leading blanks removed."""
+    return format_es(x, 25, 17, 3).lstrip()
+
+
+def trace_logical(value: bool) -> str:
+    """``book_format_mod: trace_logical``: ``T`` or ``F``."""
+    return "T" if value else "F"
+
+
+def verbose_header(
+    entry: CatalogEntry,
+    preset: int | None,
+    function: Function | None,
+    *,
+    suffix: str = "",
+) -> list[str]:
+    """The first records of a driver's ``write_verbose`` (carriage-control column included).
+
+    The title, then for a program that takes a function its line ``PRESET n: F(X) = EXPR``
+    (the catalog expression in upper case, the text ``functions_mod`` prints; ``suffix`` is
+    appended, such as Romberg's `` ON [0, B]``), then the working precision (the Python engine
+    computes in real64, like the default build). A learner's expression, which only the Python
+    engine runs, is shown as ``EXPRESSION: F(X) = <text as entered>``.
+    """
+    records = [" VERBOSE OUTPUT (NOT PART OF THE BOOK TEXT)"]
+    if preset is not None:
+        expr = entry.function.preset(preset).expr.upper()
+        records.append(f" PRESET {preset}: F(X) = {expr}{suffix}")
+    elif isinstance(function, CompiledExpr):
+        records.append(f" EXPRESSION: F(X) = {function.source.strip()}{suffix}")
+    records.append(" WORKING PRECISION: REAL64")
+    return records
 
 
 @lru_cache(maxsize=16)

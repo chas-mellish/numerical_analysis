@@ -16,6 +16,7 @@ from gerald_na.algorithms.bisection import (
     MSG_ZERO_PRODUCT,
     msg_non_convergent,
 )
+from gerald_na.engines import PythonEngine, RunRequest
 from gerald_na.errors import (
     BracketError,
     ExpressionError,
@@ -24,6 +25,7 @@ from gerald_na.errors import (
     ZeroProductError,
 )
 from gerald_na.expr import compile_expr
+from gerald_na.registry import get_registry
 
 BOOK_EXPR = "EXPF(-X) - SINF(3.1415926*X/2.)"
 BOOK_CARD = (0.0, 1.0, 1.0e-5)  # "0.  1.  1.E-5"
@@ -387,3 +389,30 @@ def check_bracket_invariant(
         if width is not None:
             assert step.x2 - step.x1 == pytest.approx(width / 2, rel=1e-9)
         width = step.x2 - step.x1
+
+
+def test_python_engine_verbose_text_on_the_book_card() -> None:
+    """The driver's ``--verbose`` extras (compared with the driver in ``tests/parity``)."""
+    entry = get_registry().get("ch01_p01")
+    outcome = PythonEngine().run(entry, RunRequest.for_entry(entry, verbose=True))
+    assert outcome.ok
+    lines = outcome.verbose_text.splitlines()
+    assert lines[:4] == [
+        "VERBOSE OUTPUT (NOT PART OF THE BOOK TEXT)",
+        "PRESET 1: F(X) = EXP(-X) - SIN(3.1415926*X/2.)",
+        "WORKING PRECISION: REAL64",
+        "DATA CARD: X1 = 0.00000000000000000E+000  X2 = 1.00000000000000000E+000"
+        "  TOL = 1.00000000000000008E-005",
+    ]
+    assert lines[-2].startswith("ROOT = 4.43572998046875000E-001  |F(ROOT)| = ")
+    assert lines[-1] == "ITERATIONS = 15 OF 25"
+    assert PythonEngine().run(entry, RunRequest.for_entry(entry)).verbose_text == ""
+
+
+def test_python_engine_verbose_text_root_at_endpoint_and_expression() -> None:
+    entry = get_registry().get("ch01_p01")
+    request = RunRequest.for_entry(entry, expression="x - 1", verbose=True)
+    lines = PythonEngine().run(entry, request).verbose_text.splitlines()
+    assert lines[1] == "EXPRESSION: F(X) = x - 1"
+    assert not any(line.startswith("FINAL BRACKET") for line in lines)  # no pass was made
+    assert lines[-1] == "ITERATIONS = 0 OF 25"

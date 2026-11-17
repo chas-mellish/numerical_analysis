@@ -193,11 +193,20 @@ class ProgramAdapter(ABC):
         """
 
     def verbose_text(
-        self, entry: CatalogEntry, inputs: Mapping[str, InputValue], result: Any
+        self,
+        entry: CatalogEntry,
+        inputs: Mapping[str, InputValue],
+        result: Any,
+        *,
+        preset: int | None = None,
+        function: Function | None = None,
     ) -> str:
-        """Python-engine extras for ``verbose`` requests (default: none).
+        """Python-engine extras for ``verbose`` requests (default: ``""``, programs without extras).
 
-        The Fortran engine returns its driver's ``--verbose`` extras instead.
+        Programs whose driver prints ``--verbose`` extras override this to return the same text
+        as the driver (real64 build, carriage-control column consumed), which the Fortran engine
+        returns instead. ``preset`` is the catalog preset id (``None`` for a custom expression or
+        a data-only program) and ``function`` the compiled function the run used.
         """
         return ""
 

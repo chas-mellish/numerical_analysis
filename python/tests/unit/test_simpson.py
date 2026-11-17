@@ -410,3 +410,18 @@ def test_adapter_needs_a_function(entry: CatalogEntry) -> None:
         SimpsonAdapter().run_python(entry, {"b": True, "n": 2}, sinc)
     with pytest.raises(TypeError):
         SimpsonAdapter().run_python(entry, {"b": 5.0, "n": 2.0}, sinc)
+
+
+def test_python_engine_verbose_text_on_the_book_card(entry: CatalogEntry) -> None:
+    """The driver's ``--verbose`` extras (compared with the driver in ``tests/parity``)."""
+    outcome = PythonEngine().run(entry, RunRequest.for_entry(entry, verbose=True))
+    assert outcome.verbose_text.splitlines() == [
+        "VERBOSE OUTPUT (NOT PART OF THE BOOK TEXT)",
+        "PRESET 1: F(X) = SIN(X)/X",
+        "WORKING PRECISION: REAL64",
+        "DATA CARD: B = 5.00000000000000000E+000  N = 100",
+        "DELX = B/N = 5.00000000000000028E-002",
+        "SUM OF WEIGHTED ORDINATES = 9.29958743862212316E+001",
+        "INTEGRAL = DELX/3*SUM = 1.54993123977035374E+000",
+        "ORDINATES EVALUATED = 101",
+    ]

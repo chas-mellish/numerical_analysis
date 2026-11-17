@@ -6,19 +6,21 @@ Data card ``X1 X2 TOL`` (generic serialization). Trace (``fortran/app/ch01_p01_b
     RESULT,value=<r>,converged=T,iterations=<int>,root_at_endpoint=<T|F>,fx1=<r>,fx2=<r>
 
 ``x1``, ``x2`` and ``tol`` of the result are the request's inputs and ``max_iter`` is the book's
-constant 25, which the driver also uses.
+constant 25, which the driver also uses. ``verbose_text`` reproduces the driver's
+``write_verbose`` (data card, F at the ends, final bracket and error bound, |F(ROOT)|).
 """
 
 from collections.abc import Mapping
 from typing import ClassVar
 
+from gerald_na.algorithms._fortran_format import render_records
 from gerald_na.algorithms.bisection import (
     BOOK_MAX_ITER,
     BisectionResult,
     BisectionStep,
     bisection,
 )
-from gerald_na.engines.adapters._common import real_input
+from gerald_na.engines.adapters._common import real_input, trace_real, verbose_header
 from gerald_na.engines.programs import Function, ProgramAdapter
 from gerald_na.engines.trace import Trace
 from gerald_na.errors import FortranRunError
@@ -76,3 +78,38 @@ class BisectionAdapter(ProgramAdapter):
             fx1=record.real("fx1"),
             fx2=record.real("fx2"),
         )
+
+    def verbose_text(
+        self,
+        entry: CatalogEntry,
+        inputs: Mapping[str, InputValue],
+        result: BisectionResult,
+        *,
+        preset: int | None = None,
+        function: Function | None = None,
+    ) -> str:
+        """The driver's ``--verbose`` extras; |F(ROOT)| is evaluated with ``function``."""
+        if function is None:
+            raise TypeError("bisection needs a function")
+        records = verbose_header(entry, preset, function)
+        records.append(
+            f" DATA CARD: X1 = {trace_real(result.x1)}  X2 = {trace_real(result.x2)}"
+            f"  TOL = {trace_real(result.tol)}"
+        )
+        records.append(f" F(X1) = {trace_real(result.fx1)}  F(X2) = {trace_real(result.fx2)}")
+        if result.steps:
+            last = result.steps[-1]
+            width = abs(last.x2 - last.x1)
+            records.append(
+                f" FINAL BRACKET: X1 = {trace_real(last.x1)}  X2 = {trace_real(last.x2)}"
+            )
+            records.append(
+                f" FINAL BRACKET WIDTH = {trace_real(width)}"
+                f"  (ERROR BOUND |X - ROOT| <= {trace_real(width / 2.0)})"
+            )
+        records.append(
+            f" ROOT = {trace_real(result.value)}"
+            f"  |F(ROOT)| = {trace_real(abs(function(result.value)))}"
+        )
+        records.append(f" ITERATIONS = {result.iterations} OF {result.max_iter}")
+        return render_records(records, carriage_control=False)
