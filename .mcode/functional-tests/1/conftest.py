@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 import requests
 
-REPO_ROOT = Path(os.environ.get("WORKSPACE_DIR", "/l2l/workspace")) / "numerical_analysis"
+REPO_ROOT = Path(__file__).resolve().parents[3]
 BIN_DIR = REPO_ROOT / "build" / "bin"
 HOST = os.environ.get("GERALD_NA_HOST", "127.0.0.1")
 PORT = os.environ.get("GERALD_NA_PORT", "8000")
