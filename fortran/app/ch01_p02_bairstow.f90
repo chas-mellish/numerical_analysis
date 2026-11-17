@@ -13,7 +13,8 @@
 !
 ! This file is the thin I/O driver. The algorithm lives in
 ! fortran/src/bairstow_mod.f90 (module bairstow_mod) and the book-style number
-! formatting in fortran/src/book_format_mod.f90.
+! formatting and trace helpers in fortran/src/book_format_mod.f90. Its flag
+! parser stays here (it rejects --preset); arg_len comes from cli_mod.
 !
 ! USAGE
 ! -----
@@ -248,11 +249,10 @@ program ch01_p02_bairstow
       factor_kind_name, is_exact_zero, n_coeffs, min_degree, max_degree, status_ok, &
       status_non_convergent, status_degree_error, degree_out_of_range, factor_quadratic, &
       factor_final_quadratic
-   use book_format_mod, only: book_fixed, book_int, trace_real, trace_int, trace_logical
+   use book_format_mod, only: book_fixed, book_fixed_nearest, book_int, &
+      trace_real, trace_int, trace_logical, no_commas
+   use cli_mod, only: arg_len
    implicit none
-
-   !> Fixed-length buffer for command-line arguments.
-   integer, parameter :: arg_len = 256
 
    ! Book text of FORMAT 1000 (page eject written as a blank), 3, 4, 7 and 24.
    character(len=*), parameter :: msg_1000 = "  DEMONSTRATION PROGRAM OUTPUT"
@@ -356,39 +356,6 @@ contains
       end if
    end subroutine input_error
 
-   !> Message text for a trace record: commas are field separators, so replace them.
-   pure function no_commas(text) result(s)
-      character(len=*), intent(in) :: text
-      character(len=len(text)) :: s
-      integer :: i
-
-      s = text
-      do i = 1, len(s)
-         if (s(i:i) == ",") s(i:i) = ";"
-      end do
-   end function no_commas
-
-   !> `Fw.d` rounded to nearest, without the leading zero of a value below one (the echo of
-   !> the data card; the factor lines use book_fixed, which chops).
-   function fixed_nearest(x, w, d) result(s)
-      real(wp), intent(in) :: x
-      integer, intent(in) :: w, d
-      character(len=w) :: s
-      character(len=32) :: fmt
-      integer :: p
-
-      write (fmt, '("(RN,F", I0, ".", I0, ")")') w, d
-      write (s, fmt) x
-      p = index(s, "0.")
-      if (p >= 1) then
-         if (p == 1) then
-            s = " "//s(2:)
-         else if (s(p - 1:p - 1) == " " .or. s(p - 1:p - 1) == "-") then
-            s = " "//s(1:p - 1)//s(p + 1:)
-         end if
-      end if
-   end function fixed_nearest
-
    !> FORMAT 24 text (leading blank = carriage control).
    function msg_24() result(s)
       character(len=:), allocatable :: s
@@ -451,7 +418,7 @@ contains
       ! DO 5 I = J,9 ... 5 PRINT 6, M, A(I): (10X, I2, 8X, F10.5)
       do i = 9 - n, 9
          write (output_unit, '(a)') repeat(" ", 10) // book_int(9 - i, 2) // repeat(" ", 8) // &
-            fixed_nearest(coeffs(i - 2), 10, 5)
+            book_fixed_nearest(coeffs(i - 2), 10, 5)
       end do
       ! PRINT 7: (//27H THE QUADRATIC FACTORS ARE- /)
       write (output_unit, '(a)') ""

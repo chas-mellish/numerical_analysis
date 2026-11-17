@@ -10,8 +10,9 @@
 !
 ! This file is the thin I/O driver. The algorithm lives in
 ! fortran/src/romberg_mod.f90 (module romberg_mod), the integrands and presets in
-! fortran/src/functions_mod.f90, and the book-style number formatting in
-! fortran/src/book_format_mod.f90.
+! fortran/src/functions_mod.f90, the book-style number formatting and trace
+! helpers in fortran/src/book_format_mod.f90, and the command-line parsing in
+! fortran/src/cli_mod.f90.
 !
 ! USAGE
 ! -----
@@ -223,11 +224,11 @@ program ch03_p02_romberg
    use functions_mod, only: real_function, get_quadrature_preset, preset_expr_len
    use romberg_mod, only: romberg, romberg_result, book_max_halvings, table_size, &
       status_ok, status_not_converged, status_invalid_value
-   use book_format_mod, only: book_fixed, book_int, trace_real, trace_int, trace_logical
+   use book_format_mod, only: book_fixed, book_fixed_nearest, book_int, &
+      trace_real, trace_int, trace_logical, no_commas
+   use cli_mod, only: parse_arguments
    implicit none
 
-   !> Fixed-length buffer for command-line arguments.
-   integer, parameter :: arg_len = 256
    !> FORMAT 203 prints at most 8 values per line (format reversion for the 9th).
    integer, parameter :: values_per_line = 8
 
@@ -280,74 +281,6 @@ program ch03_p02_romberg
 
 contains
 
-   !> Read all command-line flags (any order). Sets `arg_error` on the first bad argument.
-   subroutine parse_arguments(trace, verbose, help, preset, arg_error)
-      logical, intent(out) :: trace, verbose, help
-      integer, intent(out) :: preset
-      character(len=:), allocatable, intent(out) :: arg_error
-      character(len=arg_len) :: arg
-      integer :: i, n, length, stat
-
-      trace = .false.
-      verbose = .false.
-      help = .false.
-      preset = 1
-      n = command_argument_count()
-      i = 1
-      do while (i <= n)
-         call get_command_argument(i, arg, length, stat)
-         if (stat /= 0 .or. length > arg_len) then
-            if (.not. allocated(arg_error)) arg_error = "command-line argument " // &
-               trace_int(i) // " is too long"
-            i = i + 1
-            cycle
-         end if
-         select case (trim(arg))
-         case ("--trace")
-            trace = .true.
-         case ("--verbose")
-            verbose = .true.
-         case ("--help", "-h")
-            help = .true.
-         case ("--preset")
-            if (i == n) then
-               if (.not. allocated(arg_error)) arg_error = "--preset needs a number"
-            else
-               i = i + 1
-               call get_command_argument(i, arg, length, stat)
-               call parse_preset(arg, stat == 0 .and. length <= arg_len, preset, arg_error)
-            end if
-         case default
-            if (index(arg, "--preset=") == 1) then
-               call parse_preset(arg(len("--preset=") + 1:), .true., preset, arg_error)
-            else if (.not. allocated(arg_error)) then
-               arg_error = "unknown argument " // trim(arg) // " (try --help)"
-            end if
-         end select
-         i = i + 1
-      end do
-   end subroutine parse_arguments
-
-   !> Parse the value of --preset.
-   subroutine parse_preset(text, ok, preset, arg_error)
-      character(len=*), intent(in) :: text
-      logical, intent(in) :: ok
-      integer, intent(inout) :: preset
-      character(len=:), allocatable, intent(inout) :: arg_error
-      integer :: ios, value
-
-      value = 0
-      ios = 1
-      if (ok .and. len_trim(text) > 0 .and. verify(trim(text), "0123456789") == 0) then
-         read (text, *, iostat=ios) value
-      end if
-      if (ios == 0) then
-         preset = value
-      else if (.not. allocated(arg_error)) then
-         arg_error = "--preset needs a positive integer (got " // trim(text) // ")"
-      end if
-   end subroutine parse_preset
-
    !> Report bad input and stop: ERROR,code=INPUT (exit 2) in trace mode, else stderr (exit 1).
    subroutine input_error(message)
       character(len=*), intent(in) :: message
@@ -360,39 +293,6 @@ contains
          stop 1, quiet=.true.
       end if
    end subroutine input_error
-
-   !> Message text for a trace record: commas are field separators, so replace them.
-   pure function no_commas(text) result(s)
-      character(len=*), intent(in) :: text
-      character(len=len(text)) :: s
-      integer :: i
-
-      s = text
-      do i = 1, len(s)
-         if (s(i:i) == ",") s(i:i) = ";"
-      end do
-   end function no_commas
-
-   !> Input echo `Fw.d` (B in FORMAT 200): rounded to nearest, book style without the
-   !> leading zero of a value below one (see ERRATA B, printed digits).
-   function input_fixed(x, w, d) result(s)
-      real(wp), intent(in) :: x
-      integer, intent(in) :: w, d
-      character(len=w) :: s
-      character(len=32) :: fmt
-      integer :: p
-
-      write (fmt, '("(RN,F", I0, ".", I0, ")")') w, d
-      write (s, fmt) x
-      p = index(s, "0.")
-      if (p >= 1) then
-         if (p == 1) then
-            s = " "//s(2:)
-         else if (s(p - 1:p - 1) == " " .or. s(p - 1:p - 1) == "-") then
-            s = " "//s(1:p - 1)//s(p + 1:)
-         end if
-      end if
-   end function input_fixed
 
    !> Input echo `Ew.d` (TOL in FORMATs 201 and 202) as the book printed it: one digit
    !> before the decimal point (`ESw.d`), rounded to nearest (see ERRATA B).
@@ -430,7 +330,7 @@ contains
       write (output_unit, '(a)') ""
       write (output_unit, '(a)') ""
       write (output_unit, '(a)') " VALUE OF SINE INTEGRAL BETWEEN 0 AND " // &
-         input_fixed(b, 6, 2) // " BY ROMBERG INTEGRATION "
+         book_fixed_nearest(b, 6, 2) // " BY ROMBERG INTEGRATION "
       write (output_unit, '(a)') ""
 
       ! 203 FORMAT (1H ,8F10.7): row L = TRAP(1..L, L); 8 values per record.

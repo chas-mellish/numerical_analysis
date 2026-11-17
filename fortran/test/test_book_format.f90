@@ -1,7 +1,9 @@
-!> test-drive suite for `book_format_mod`: book-style Fw.d fields and trace value rendering.
+!> test-drive suite for `book_format_mod`: book-style Fw.d fields, trace value rendering and
+!> comma-free trace messages.
 module test_book_format_suite
    use precision, only: wp
-   use book_format_mod, only: book_fixed, book_int, trace_real, trace_int, trace_logical
+   use book_format_mod, only: book_fixed, book_fixed_nearest, book_int, trace_real, trace_int, &
+      trace_logical, no_commas
    use testdrive, only: new_unittest, unittest_type, error_type, check
    implicit none
    private
@@ -17,9 +19,11 @@ contains
       testsuite = [ &
          new_unittest("no_leading_zero", test_no_leading_zero), &
          new_unittest("round_toward_zero", test_round_toward_zero), &
+         new_unittest("round_to_nearest", test_round_to_nearest), &
          new_unittest("wide_values_unchanged", test_wide_values), &
          new_unittest("book_int", test_book_int), &
-         new_unittest("trace_values", test_trace_values) &
+         new_unittest("trace_values", test_trace_values), &
+         new_unittest("no_commas", test_no_commas) &
       ]
    end subroutine collect_book_format
 
@@ -50,6 +54,19 @@ contains
       if (allocated(error)) return
       call check(error, book_fixed(-0.000506051_wp, 10, 6), "  -.000506")
    end subroutine test_round_toward_zero
+
+   !> `book_fixed_nearest` (data-card echoes) rounds to nearest; the field layout is the same.
+   subroutine test_round_to_nearest(error)
+      type(error_type), allocatable, intent(out) :: error
+
+      call check(error, book_fixed_nearest(0.443572998046875_wp, 10, 7), "  .4435730")
+      if (allocated(error)) return
+      call check(error, book_fixed_nearest(-0.5_wp, 10, 7), " -.5000000")
+      if (allocated(error)) return
+      call check(error, book_fixed_nearest(99.41_wp, 10, 5), "  99.41000")
+      if (allocated(error)) return
+      call check(error, book_fixed_nearest(15.0_wp, 6, 2), " 15.00")
+   end subroutine test_round_to_nearest
 
    !> Values with an integer part keep their digits; overflow gives asterisks.
    subroutine test_wide_values(error)
@@ -100,5 +117,14 @@ contains
       if (allocated(error)) return
       call check(error, trace_logical(.false.), "F")
    end subroutine test_trace_values
+
+   !> Trace messages never contain the field separator: commas become semicolons.
+   subroutine test_no_commas(error)
+      type(error_type), allocatable, intent(out) :: error
+
+      call check(error, no_commas("A, B,C"), "A; B;C")
+      if (allocated(error)) return
+      call check(error, no_commas("no separators"), "no separators")
+   end subroutine test_no_commas
 
 end module test_book_format_suite

@@ -19,7 +19,8 @@ numerical_analysis/
   content/<id>.md              study pages
   config/settings.toml         runtime settings
   fortran/fpm.toml             Fortran package (gerald_na_fortran)
-  fortran/src/                 precision.F90 and one module per method
+  fortran/src/                 precision.F90, one module per method, and the driver helpers
+                               book_format_mod (book/trace formatting) and cli_mod (flags)
   fortran/app/                 thin I/O drivers, one executable per program
   fortran/test/                test-drive suites
   python/pyproject.toml        Python package gerald-na (hatchling, uv)
@@ -478,7 +479,10 @@ add a program (Bairstow, Simpson, Romberg, Lagrange or a future chapter):
 1. Write the catalog file, the Fortran module and driver (with `--trace` per DD2: `STEP` keys =
    catalog `step_columns`, every result field not taken from the inputs in `RESULT` extras listed
    in `result_extras`, program-specific records listed in `[trace] records`), and the Python
-   algorithm whose step dataclass fields equal the `step_columns` keys.
+   algorithm whose step dataclass fields equal the `step_columns` keys. Drivers format output
+   with `book_format_mod` (`book_fixed`, `book_fixed_nearest`, the `trace_*` helpers and
+   `no_commas` for `ERROR` messages) and, when they take a function preset, parse their flags
+   with `cli_mod`'s `parse_arguments`; they do not keep private copies of these helpers.
 2. Create `python/src/gerald_na/engines/adapters/<name>.py` with a `ProgramAdapter` subclass:
    * `program_id`, `result_type` (the result dataclass) and `step_type` (the step dataclass);
    * `run_python(entry, inputs, function)`: call the algorithm with the validated inputs (keyed by

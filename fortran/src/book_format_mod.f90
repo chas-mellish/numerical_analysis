@@ -8,14 +8,19 @@
 !>   leading zero. Modern processors print `0.4414063` by default, so both conventions are
 !>   applied explicitly here. Field width and decimals are unchanged; a value that does not
 !>   fit still prints as asterisks, as `Fw.d` requires.
+!> * `book_fixed_nearest` is the same field rounded to nearest (the `RN` edit mode), for the
+!>   echoes of data-card values, which the book printed as the exact card digits.
 !> * `trace_real`, `trace_int`, `trace_logical` render values for the `--trace` protocol (DD2):
 !>   reals with `ES25.17E3` (leading blanks removed), integers with `I0`, logicals `T`/`F`.
+!> * `no_commas` makes message text safe for a trace record: commas are the protocol's field
+!>   separators, so an `ERROR` message never contains one.
 module book_format_mod
    use precision, only: wp
    implicit none
    private
 
-   public :: book_fixed, book_int, trace_real, trace_int, trace_logical
+   public :: book_fixed, book_fixed_nearest, book_int, trace_real, trace_int, trace_logical, &
+      no_commas
 
 contains
 
@@ -24,10 +29,29 @@ contains
       real(wp), intent(in) :: x
       integer, intent(in) :: w, d
       character(len=w) :: s
+
+      s = fixed_point(x, w, d, "RZ")
+   end function book_fixed
+
+   !> Book-style `Fw.d` rounded to nearest, without the leading zero of a value below one.
+   function book_fixed_nearest(x, w, d) result(s)
+      real(wp), intent(in) :: x
+      integer, intent(in) :: w, d
+      character(len=w) :: s
+
+      s = fixed_point(x, w, d, "RN")
+   end function book_fixed_nearest
+
+   !> `Fw.d` under the rounding edit mode `mode` (`RZ` or `RN`), leading zero suppressed.
+   function fixed_point(x, w, d, mode) result(s)
+      real(wp), intent(in) :: x
+      integer, intent(in) :: w, d
+      character(len=2), intent(in) :: mode
+      character(len=w) :: s
       character(len=32) :: fmt
       integer :: p
 
-      write (fmt, '("(RZ,F", I0, ".", I0, ")")') w, d
+      write (fmt, '("(", A, ",F", I0, ".", I0, ")")') mode, w, d
       write (s, fmt) x
       ! "0." whose zero is the only integer digit (start of field, or preceded by a blank or
       ! a minus sign) loses the zero; the rest of the field shifts right by one column so the
@@ -40,7 +64,7 @@ contains
             s = " "//s(1:p - 1)//s(p + 1:)
          end if
       end if
-   end function book_fixed
+   end function fixed_point
 
    !> `Iw` edit descriptor, for the book's integer fields (for example `I3`).
    function book_int(i, w) result(s)
@@ -83,5 +107,17 @@ contains
          s = "F"
       end if
    end function trace_logical
+
+   !> Message text for a trace record: commas are field separators, so replace them.
+   pure function no_commas(text) result(s)
+      character(len=*), intent(in) :: text
+      character(len=len(text)) :: s
+      integer :: i
+
+      s = text
+      do i = 1, len(s)
+         if (s(i:i) == ",") s(i:i) = ";"
+      end do
+   end function no_commas
 
 end module book_format_mod

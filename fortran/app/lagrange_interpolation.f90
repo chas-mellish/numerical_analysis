@@ -13,7 +13,8 @@
 !
 ! This file is the thin I/O driver. The algorithm lives in
 ! fortran/src/lagrange_mod.f90 (module lagrange_mod) and the book-style number
-! formatting in fortran/src/book_format_mod.f90.
+! formatting and trace helpers in fortran/src/book_format_mod.f90. Its flag
+! parser stays here (it rejects --preset); arg_len comes from cli_mod.
 !
 ! USAGE
 ! -----
@@ -182,11 +183,10 @@ program lagrange_interpolation
    use precision, only: wp, single_precision
    use lagrange_mod, only: lagrange, lagrange_result, max_points, status_ok, &
       status_degree_error, status_size_mismatch, status_duplicate_x, status_invalid_value
-   use book_format_mod, only: book_fixed, book_int, trace_real, trace_int, trace_logical
+   use book_format_mod, only: book_fixed, book_int, trace_real, trace_int, trace_logical, no_commas
+   use cli_mod, only: arg_len
    implicit none
 
-   !> Fixed-length buffer for command-line arguments.
-   integer, parameter :: arg_len = 256
    !> Upper bound on the size of the data card text read from stdin.
    integer, parameter :: max_card_chars = 1000000
 
@@ -371,18 +371,6 @@ contains
 
       call fail("INPUT", message)
    end subroutine input_error
-
-   !> Message text for a trace record: commas are field separators, so replace them.
-   pure function no_commas(text) result(s)
-      character(len=*), intent(in) :: text
-      character(len=len(text)) :: s
-      integer :: i
-
-      s = text
-      do i = 1, len(s)
-         if (s(i:i) == ",") s(i:i) = ";"
-      end do
-   end function no_commas
 
    !> The book's line-printer output: FORMAT 200 (two records). Errors go to stderr.
    subroutine write_book_text(res)
