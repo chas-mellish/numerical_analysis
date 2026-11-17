@@ -28,7 +28,7 @@
 {% macro extras(v) %}
   {% if v.extras %}
   <details class="extras" data-testid="result-extras" open>
-    <summary>Result details</summary>
+    <summary data-testid="result-details-toggle">Result details</summary>
     {% set scalars = v.extras | selectattr("kind", "equalto", "scalar") | list %}
     {% if scalars %}
     <dl class="kv">

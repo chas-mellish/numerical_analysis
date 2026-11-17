@@ -41,7 +41,7 @@
         {% for note in c.notes %}<li data-testid="compare-note">{{ note }}</li>{% endfor %}
       </ul>
       <details>
-        <summary>Per column</summary>
+        <summary data-testid="per-column-toggle">Per column</summary>
         <table class="records" data-testid="compare-columns">
           <thead><tr><th scope="col">Column</th><th scope="col">max abs diff</th><th scope="col">max rel diff</th><th scope="col">differing rows</th></tr></thead>
           <tbody>{% for col in c.columns %}<tr><th scope="row">{{ col.label }}</th><td>{{ col.max_abs_diff | sci }}</td><td>{{ col.max_rel_diff | sci }}</td><td>{{ col.differing_rows }}</td></tr>{% endfor %}</tbody>
