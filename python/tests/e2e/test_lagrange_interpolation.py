@@ -14,13 +14,6 @@ pytestmark = pytest.mark.e2e
 
 ENTRY = get_registry().get("lagrange_interpolation")
 
-N_SYNC_PENDING = (
-    "Lagrange N auto-sync is not in the web UI yet (pending web UI task: app.js should update "
-    "input-n when a point row is added or removed); without it the learner updates N by hand, "
-    "which this test checked instead"
-)
-"""Skip reason when adding a point row leaves N unchanged (checked behaviourally, not faked)."""
-
 EXTRA_POINT = ("11.0", "3.1")
 
 
@@ -60,34 +53,24 @@ def test_lagrange_fortran_and_compare(page: Page, live_server: LiveServer) -> No
 
 
 def test_lagrange_add_point_keeps_n_in_sync(page: Page) -> None:
-    """Adding a sixth pair: N follows the rows (once auto-sync lands) and the run uses 6 terms."""
+    """Adding a sixth pair moves N to 6 and the run uses 6 terms; removing it moves N back to 5.
+
+    app.js keeps the count field (``data-count-of="points"``) equal to the number of rows; the
+    server still rejects an N typed by hand that disagrees with the rows.
+    """
     program = ProgramPage(page, ENTRY).open()
     book_points = default_form_values(ENTRY).points["points"]
     rows = program.tid("input-points").locator("[data-row]")
     expect(rows).to_have_count(5)
     expect(program.tid("input-n")).to_have_value("5")
+    expect(program.tid("field-sync-note-n")).to_be_visible()
 
     program.tid("add-row-points").click()
     expect(rows).to_have_count(6)
     expect(program.tid("remove-row-points-5")).to_be_visible()
+    expect(program.tid("input-n")).to_have_value("6")
     program.tid("input-points-5-x").fill(EXTRA_POINT[0])
     program.tid("input-points-5-y").fill(EXTRA_POINT[1])
-
-    try:
-        expect(program.tid("input-n")).to_have_value("6", timeout=2000)
-        synced = True
-    except AssertionError:
-        synced = False
-
-    if not synced:
-        # the current contract: N is the learner's to update, a mismatch is a field error on n
-        expect(program.tid("input-n")).to_have_value("5")
-        program.run()
-        expect(program.tid("validation-error")).to_be_visible()
-        expect(program.tid("field-error-n")).to_contain_text(
-            "N must equal the number of (X, Y) pairs"
-        )
-        program.fill(n="6")
 
     xs = [float(x) for x, _ in book_points] + [float(EXTRA_POINT[0])]
     ys = [float(y) for _, y in book_points] + [float(EXTRA_POINT[1])]
@@ -97,11 +80,14 @@ def test_lagrange_add_point_keeps_n_in_sync(page: Page) -> None:
 
     program.tid("remove-row-points-5").click()
     expect(rows).to_have_count(5)
-    if synced:
-        expect(program.tid("input-n")).to_have_value("5")
-        expected = golden(ENTRY)
-        program.run()
-        expect(program.tid("result-iterations")).to_have_text(str(expected.rows))
-        assert abs(program.result_value() - expected.value) <= expected.tolerance
-    else:
-        pytest.skip(N_SYNC_PENDING)
+    expect(program.tid("input-n")).to_have_value("5")
+    expected = golden(ENTRY)
+    program.run()
+    expect(program.tid("result-iterations")).to_have_text(str(expected.rows))
+    assert abs(program.result_value() - expected.value) <= expected.tolerance
+
+    # server validation stays: an N that disagrees with the rows is a field error on n
+    program.fill(n="4")
+    program.run()
+    expect(program.tid("validation-error")).to_be_visible()
+    expect(program.tid("field-error-n")).to_contain_text("N must equal the number of (X, Y) pairs")
