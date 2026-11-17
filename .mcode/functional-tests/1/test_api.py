@@ -34,6 +34,8 @@ class TestCatalogApi:
         assert body["id"] == "ch03_p02"
         assert body["data_card"]["values"] == {"b": 15.0, "tol": 2e-7}
         assert body["files"]["scan"] == "/files/ch03_p02/scan"
+        errata = {e["id"] for e in body["errata"]}
+        assert "non-finite-values" in errata
 
     def test_api_get_program_not_found(self, evidence):
         resp = requests.get(f"{BASE_URL}/api/programs/ch09_p09", timeout=10)

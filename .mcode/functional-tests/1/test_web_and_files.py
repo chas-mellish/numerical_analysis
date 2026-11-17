@@ -55,6 +55,8 @@ class TestHtmlPages:
         evidence(status=resp.status_code, body=resp.text[:2000], request=form,
                  endpoint="/programs/ch01_p01/run", method="POST")
         assert resp.status_code == 422
+        assert 'data-code="INPUT"' in resp.text
+        assert 'data-testid="field-error-x1"' in resp.text
 
     def test_html_run_form_custom_on_fortran(self, evidence):
         form = {"engine": "fortran", "in_x1": "1", "in_x2": "2", "in_tol": "1.E-5",
@@ -63,6 +65,7 @@ class TestHtmlPages:
         evidence(status=resp.status_code, body=resp.text[:2000], request=form,
                  endpoint="/programs/ch01_p01/run", method="POST")
         assert resp.status_code == 422
+        assert 'data-testid="validation-error" data-code="CUSTOM_FUNCTION_ENGINE"' in resp.text
 
 
 class TestPractice:
