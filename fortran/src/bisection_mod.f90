@@ -25,15 +25,19 @@
 !>   11 FX*FX1 = 0        -> status_zero_product_error, iterations = I >= 1 (book message 205)
 !>   12 FX*FX1 > 0        -> X1 = X, FX1 = FX
 !>   loop exhausted       -> status_non_convergent, value = last X (book message 204)
+!>   F returns NaN        -> status_invalid_value (no book equivalent; the original machine
+!>                          had no NaN). Checked after each evaluation of F, before any test:
+!>                          value = the offending X, steps = the rows completed before it.
 !>
 !> Correction of an original bug: in the scan, label 5 (`PRINT 201, X1`) has no `CALL EXIT`
 !> and falls through to label 4, so F(X1) = 0 with F(X2) /= 0 printed "X1 is a root" and then
 !> the 202 "ERROR. FX1 AND FX2 NOT ZERO ..." message. Here F(X1) = 0 is a root at the endpoint
 !> (the intent stated by the listing's own comment "WHEN PRODUCT OF FX1*FX2 IS ZERO, X1 OR X2
 !> IS A ROOT"). When both F(X1) and F(X2) are zero the original printed both input values as
-!> roots; `fx1`/`fx2` in the result let the driver do the same. NaN products (impossible on
-!> the original machine) take the positive branch.
+!> roots; `fx1`/`fx2` in the result let the driver do the same. A NaN product that still
+!> reaches an arithmetic IF (only possible from 0*Inf) takes the positive branch.
 module bisection_mod
+   use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
    use precision, only: wp
    use functions_mod, only: real_function
    implicit none
@@ -52,9 +56,10 @@ module bisection_mod
       enumerator :: status_bracket_error = 2
       enumerator :: status_zero_product_error = 3
       enumerator :: status_non_convergent = 4
+      enumerator :: status_invalid_value = 5
    end enum
    public :: status_ok, status_root_at_endpoint, status_bracket_error
-   public :: status_zero_product_error, status_non_convergent
+   public :: status_zero_product_error, status_non_convergent, status_invalid_value
 
    !> One row of the iteration table: bracket at the start of iteration `k`, midpoint, F(mid).
    type :: bisection_step
@@ -114,6 +119,8 @@ contains
          name = "zero_product_error"
       case (status_non_convergent)
          name = "non_convergent"
+      case (status_invalid_value)
+         name = "invalid_value"
       case default
          name = "unknown"
       end select
@@ -144,6 +151,18 @@ contains
       res%converged = .false.
       res%iterations = 0
       allocate (res%steps(0))
+
+      ! F must be a number at both input values (InputError on the Python engine).
+      if (ieee_is_nan(fa)) then
+         res%status = status_invalid_value
+         res%value = a
+         return
+      end if
+      if (ieee_is_nan(res%fx2)) then
+         res%status = status_invalid_value
+         res%value = b
+         return
+      end if
 
       ! IF (FX1*FX2) 1, 2, 3
       select case (arith_if(fa*res%fx2))
@@ -177,6 +196,13 @@ contains
       do i = 1, limit
          x = (a + b)/2.0_wp
          fx = f(x)
+         if (ieee_is_nan(fx)) then
+            res%status = status_invalid_value
+            res%value = x
+            res%iterations = i - 1
+            res%steps = steps(1:i - 1)
+            return
+         end if
          steps(i) = bisection_step(k=i, x1=a, x2=b, x=x, fx=fx)
          res%iterations = i
 

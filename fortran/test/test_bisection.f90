@@ -10,7 +10,7 @@ module test_bisection_suite
       preset_expr_len
    use bisection_mod, only: bisection, bisection_result, book_max_iter, arith_if, &
       status_name, status_ok, status_root_at_endpoint, status_bracket_error, &
-      status_zero_product_error, status_non_convergent
+      status_zero_product_error, status_non_convergent, status_invalid_value
    use book_format_mod, only: book_fixed
    use testdrive, only: new_unittest, unittest_type, error_type, check, test_failed
    implicit none
@@ -55,6 +55,8 @@ contains
          new_unittest("exact_zero_midpoint_negative_tol", test_exact_zero_negative_tol), &
          new_unittest("non_convergent_25", test_non_convergent_25), &
          new_unittest("non_convergent_max_iter", test_non_convergent_max_iter), &
+         new_unittest("nan_at_endpoint_is_invalid", test_nan_endpoint), &
+         new_unittest("nan_at_midpoint_is_invalid", test_nan_midpoint), &
          new_unittest("arith_if_branches", test_arith_if), &
          new_unittest("status_names", test_status_names), &
          new_unittest("preset_2_and_3", test_presets) &
@@ -132,6 +134,30 @@ contains
          y = tiny_scale()
       end if
    end function f_tiny_step
+
+   !> NaN at X = 0, -1 at X = 1.
+   pure function f_nan_at_zero(x) result(y)
+      real(wp), intent(in) :: x
+      real(wp) :: y
+      if (x < 0.5_wp) then
+         y = ieee_value(1.0_wp, ieee_quiet_nan)
+      else
+         y = -1.0_wp
+      end if
+   end function f_nan_at_zero
+
+   !> Brackets [0,1] (F(0) = -1, F(1) = 1) but is NaN on [0.3,0.4], hit at the 3rd midpoint.
+   pure function f_nan_inside(x) result(y)
+      real(wp), intent(in) :: x
+      real(wp) :: y
+      if (x >= 0.3_wp .and. x <= 0.4_wp) then
+         y = ieee_value(1.0_wp, ieee_quiet_nan)
+      else if (x < 0.35_wp) then
+         y = -1.0_wp
+      else
+         y = 1.0_wp
+      end if
+   end function f_nan_inside
 
    ! ---------------------------------------------------------------------------------------
    ! Helpers
@@ -461,6 +487,35 @@ contains
    end subroutine test_non_convergent_max_iter
 
    ! ---------------------------------------------------------------------------------------
+   ! NaN function values (INPUT error, no book equivalent)
+   ! ---------------------------------------------------------------------------------------
+
+   !> F(X1) is NaN: invalid before the bracket test.
+   subroutine test_nan_endpoint(error)
+      type(error_type), allocatable, intent(out) :: error
+      type(bisection_result) :: res
+
+      res = bisection(f_nan_at_zero, 0.0_wp, 1.0_wp, 1.0e-5_wp)
+      call check_outcome(error, res, status_invalid_value, .false., 0)
+      if (allocated(error)) return
+      call check(error, same(res%value, 0.0_wp), "value must be the offending X")
+      if (allocated(error)) return
+      res = bisection(f_nan_at_zero, 1.0_wp, 0.0_wp, 1.0e-5_wp)
+      call check_outcome(error, res, status_invalid_value, .false., 0)
+   end subroutine test_nan_endpoint
+
+   !> F(X) is NaN at the third midpoint 0.375: two completed rows, then invalid.
+   subroutine test_nan_midpoint(error)
+      type(error_type), allocatable, intent(out) :: error
+      type(bisection_result) :: res
+
+      res = bisection(f_nan_inside, 0.0_wp, 1.0_wp, 1.0e-5_wp)
+      call check_outcome(error, res, status_invalid_value, .false., 2)
+      if (allocated(error)) return
+      call check(error, same(res%value, 0.375_wp), "value must be the NaN midpoint")
+   end subroutine test_nan_midpoint
+
+   ! ---------------------------------------------------------------------------------------
    ! Helpers of the module
    ! ---------------------------------------------------------------------------------------
 
@@ -496,6 +551,8 @@ contains
       call check(error, status_name(status_zero_product_error), "zero_product_error")
       if (allocated(error)) return
       call check(error, status_name(status_non_convergent), "non_convergent")
+      if (allocated(error)) return
+      call check(error, status_name(status_invalid_value), "invalid_value")
       if (allocated(error)) return
       call check(error, status_name(99), "unknown")
    end subroutine test_status_names

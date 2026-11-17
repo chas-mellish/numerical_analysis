@@ -33,6 +33,8 @@
 !     RESULT,value=<r>,converged=T,iterations=<I0>,root_at_endpoint=<T|F>
 !     ERROR,code=<BRACKET|ZERO_PRODUCT|NON_CONVERGENT|INPUT>,message=<text>
 !   reals as ES25.17E3 without leading blanks; on ERROR the exit status is 2.
+!   ZERO_PRODUCT carries the book's message (202 before the loop, "ERROR." for
+!   label 11); INPUT also covers a NaN function value.
 !
 ! TRANSCRIPTION OF THE SCAN
 ! -------------------------
@@ -169,6 +171,38 @@
 !     All other F(X) entries agree with the book in both builds, and every
 !     F(X) agrees with the book value within 1E-6
 !     (fortran/test/test_bisection.f90 checks every row and these exceptions).
+! F. Index of the catalog errata (catalog/ch01_p01_bisection.toml [[errata]],
+!    also on content/ch01_p01.md), one line per id, in catalog order:
+!   1 zero-product-branch (rewrite_drift): label 11 restored; FX*FX1 exactly
+!     zero prints " ERROR." and stops. Trace: ERROR,code=ZERO_PRODUCT,
+!     message=ERROR. (exit 2). See A.
+!   2 non-convergence-message (rewrite_drift): " NON-CONVERGENT IN 25
+!     ITERATIONS." after the DO 30 loop; trace code NON_CONVERGENT. See A.
+!   3 endpoint-root-format (rewrite_drift): FORMAT 201 with F6.3 (rewrite:
+!     F10.7); trace RESULT with root_at_endpoint=T, iterations=0. See A, C.
+!   4 product-zero-test-order (rewrite_drift): the rewrite printed the 202
+!     message when both values were zero, the opposite of its wording; the
+!     order X1-root, X2-root, error (labels 2, 5, 4, 7, 6) is restored and 202
+!     is reached only when FX1*FX2 underflows to zero. Trace code ZERO_PRODUCT.
+!   5 hard-coded-inputs (rewrite_drift): the data card X1 X2 TOL is read from
+!     stdin again, list-directed, in the book's order. See B, D.
+!   6 line-layout (rewrite_drift): FORMATs 206 and 203 restored with their
+!     Hollerith widths, the comma in "THE VALUE, X =" and the leading blank
+!     (carriage-control column, kept on stdout). See A.
+!   7 bracket-message-unit (original_quirk): TYPE 200 went to the console
+!     typewriter; it is written to stdout with the rest of the run. See D.
+!   8 truncated-digits (original_quirk): the book printed chopped digits
+!     without a leading zero (.4414062 ... .4435729). The golden tests compare
+!     numbers; in addition this driver's book text uses RZ and drops the
+!     leading zero so the text matches the scan. See E.
+!   9 structured-control-flow (modernization): arithmetic IF / GO TO / CALL
+!     EXIT became SELECT CASE, a DO loop and STOP with an exit status; F is a
+!     procedure argument (--preset N); EXPF/SINF/ABSF became EXP/SIN/ABS;
+!     every zero branch is kept. See D.
+!   Not a catalog id: the label-5 fall-through bug of the original (C) and
+!   NaN function values. F returning NaN (impossible on the original machine)
+!   stops the run as an INPUT error (ERROR,code=INPUT in trace mode, a message
+!   on stderr and exit 1 otherwise), matching InputError on the Python engine.
 !===============================================================================
 program ch01_p01_bisection
    use, intrinsic :: iso_fortran_env, only: input_unit, output_unit, error_unit
@@ -177,7 +211,7 @@ program ch01_p01_bisection
    use functions_mod, only: real_function, get_bisection_preset, preset_expr_len
    use bisection_mod, only: bisection, bisection_result, book_max_iter, status_ok, &
       status_root_at_endpoint, status_bracket_error, status_zero_product_error, &
-      status_non_convergent
+      status_non_convergent, status_invalid_value
    use book_format_mod, only: book_fixed, book_int, trace_real, trace_int, trace_logical
    implicit none
 
@@ -363,8 +397,19 @@ contains
          end if
       case (status_non_convergent)
          write (output_unit, '(a)') msg_204
+      case (status_invalid_value)
+         ! No book message exists: report on stderr like the other input errors.
+         write (error_unit, '(a)') "ch01_p01_bisection: " // nan_message(res)
       end select
    end subroutine write_book_text
+
+   !> Message for a NaN function value (INPUT error; InputError on the Python engine).
+   function nan_message(res) result(message)
+      type(bisection_result), intent(in) :: res
+      character(len=:), allocatable :: message
+
+      message = "F(X) is not a number at X = " // trace_real(res%value)
+   end function nan_message
 
    !> FORMAT 201.
    subroutine write_input_root(x)
@@ -408,11 +453,13 @@ contains
                trim(adjustl(msg_202))
          else
             write (output_unit, '(a)') "ERROR,code=ZERO_PRODUCT,message=" // &
-               "ERROR. FX*FX1 TESTS ZERO AT ITERATION " // trace_int(res%iterations)
+               trim(adjustl(msg_205))
          end if
       case (status_non_convergent)
          write (output_unit, '(a)') "ERROR,code=NON_CONVERGENT,message=" // &
             trim(adjustl(msg_204))
+      case (status_invalid_value)
+         write (output_unit, '(a)') "ERROR,code=INPUT,message=" // nan_message(res)
       end select
    end subroutine write_trace
 
