@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from typing import ClassVar
 
 from gerald_na.algorithms.bairstow import (
+    FACTOR_COEFFICIENT_NAMES,
     BairstowFactor,
     BairstowResult,
     BairstowStep,
@@ -33,12 +34,6 @@ __all__ = ["FACTOR", "BairstowAdapter", "factor_from_record"]
 FACTOR = "FACTOR"
 """Record type of the printed factors."""
 
-_FACTOR_KEYS: dict[str, tuple[str, ...]] = {
-    "quadratic": ("r", "s"),
-    "final_quadratic": ("a2", "a1", "a0"),
-    "linear": ("a1", "a0"),
-}
-
 
 def _coefficients(inputs: Mapping[str, InputValue]) -> tuple[float, ...]:
     value = inputs["a"]
@@ -50,7 +45,7 @@ def _coefficients(inputs: Mapping[str, InputValue]) -> tuple[float, ...]:
 def factor_from_record(record: Record) -> BairstowFactor:
     """A :class:`BairstowFactor` from one ``FACTOR`` record (exactly the documented keys)."""
     kind = record.text("kind")
-    keys = _FACTOR_KEYS.get(kind)
+    keys = FACTOR_COEFFICIENT_NAMES.get(kind)  # type: ignore[call-overload]
     if keys is None:
         raise FortranRunError(f"trace line {record.line}: unknown FACTOR kind {kind!r}")
     if set(record.fields) != {"kind", *keys}:

@@ -44,6 +44,8 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, fields, is_dataclass
 from typing import Any
 
+from gerald_na.algorithms.bairstow import FACTOR_COEFFICIENT_NAMES
+
 __all__ = [
     "CHART_BUILDERS",
     "ChartInput",
@@ -430,11 +432,8 @@ def _root(item: object) -> complex | None:
     return None
 
 
-_COEFFICIENT_NAMES: Mapping[str, tuple[str, ...]] = {
-    "quadratic": ("r", "s"),
-    "final_quadratic": ("a2", "a1", "a0"),
-    "linear": ("a1", "a0"),
-}
+_COEFFICIENT_NAMES: Mapping[str, tuple[str, ...]] = FACTOR_COEFFICIENT_NAMES  # type: ignore[assignment]
+"""Coefficient names of a factor row by ``kind`` (the Bairstow ``FACTOR`` record keys)."""
 
 
 def _with_named_coefficients(mapping: Mapping[str, Any]) -> Mapping[str, Any]:
