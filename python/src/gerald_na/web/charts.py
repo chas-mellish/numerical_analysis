@@ -32,6 +32,12 @@ What each kind reads (option defaults in brackets; see ``docs/architecture.md``)
   shows the sum of their absolute values per iteration (log scale unless ``log_delta = false``);
   with ``poly_input`` and ``show_polynomial = true`` a ``factors_polynomial`` figure draws P(x)
   with the real roots from the factors marked.
+* ``convergence`` -- steps ``y_keys`` (a list) against step ``x_key`` [h] (the row number if
+  absent), one figure ``convergence_<key>`` each, on a log x axis unless ``log_x = false``;
+  keys in ``log_y_keys`` are drawn as |y| on a log scale. With ``changes`` [true] the figure
+  ``convergence_changes`` shows |y(row i+1) - y(row i)| at the x of row i (log-log), an
+  estimate of each row's error that exposes where round-off takes over. Zeros and negative
+  values are left out on log axes.
 * ``interpolant`` -- the nodes of input ``points_input`` [points] (only the first
   ``count_input`` [n] when that input exists), the Lagrange polynomial through them, and the
   evaluated point (input ``x_input`` [xin], result ``value``); ``samples`` [400] curve points,
@@ -39,6 +45,7 @@ What each kind reads (option defaults in brackets; see ``docs/architecture.md``)
 """
 
 import cmath
+import itertools
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, fields, is_dataclass
@@ -221,8 +228,7 @@ def _abs_residual_figure(data: ChartInput) -> Figure:
     title = f"|{label}| per iteration" + (" (log scale)" if log else "")
     layout = _layout(title, "iteration", f"|{label}|", showlegend=False)
     if log:
-        layout["yaxis"]["type"] = "log"
-        layout["yaxis"]["exponentformat"] = "power"
+        _log_axis(layout["yaxis"])
     return _figure("abs_residual", title, [trace], layout)
 
 
@@ -398,6 +404,90 @@ def integrand_panels_figures(data: ChartInput) -> list[Figure]:
     return [_figure("integrand_panels", title, traces, _layout(title, "x", "F(x)"))]
 
 
+def _option_keys(data: ChartInput, key: str) -> list[str]:
+    """A list-of-step-keys option (a single string is one key)."""
+    value = data.option(key, [])
+    if isinstance(value, str):
+        return [value]
+    return [str(item) for item in value] if isinstance(value, list | tuple) else []
+
+
+def _positive(values: Sequence[float | None]) -> list[float | None]:
+    """``values`` with zeros, negatives and gaps removed (a log axis cannot show them)."""
+    return [v if v is not None and v > 0.0 else None for v in values]
+
+
+def _log_axis(axis: dict[str, Any]) -> None:
+    axis["type"] = "log"
+    axis["exponentformat"] = "power"
+
+
+def convergence_figures(data: ChartInput) -> list[Figure]:
+    """Step columns against another step column (e.g. an estimate against the step size H).
+
+    One figure ``convergence_<key>`` per key of ``y_keys``, plus ``convergence_changes``: the
+    change |y(row i) - y(row i-1)| of every key, drawn at the x of row i-1, which estimates the
+    error of that row when the rows converge quickly and shows where round-off takes over.
+    """
+    x_key = str(data.option("x_key", "h"))
+    y_keys = _option_keys(data, "y_keys")
+    log_y_keys = set(_option_keys(data, "log_y_keys"))
+    log_x = bool(data.option("log_x", True))
+    x_label = data.label(x_key)
+    xs = _column(data.steps, x_key)
+    if data.steps and all(value is None for value in xs):
+        xs = [float(i) for i in range(1, len(data.steps) + 1)]
+        x_label = "row"
+    shown_x = _positive(xs) if log_x else xs
+    figures: list[Figure] = []
+    for slot, key in enumerate(y_keys):
+        label = data.label(key)
+        ys = _column(data.steps, key)
+        log_y = key in log_y_keys
+        name = f"|{label}|" if log_y else label
+        if log_y:
+            ys = _positive([None if v is None else abs(v) for v in ys])
+        trace = _line(
+            name,
+            shown_x,
+            ys,
+            slot,
+            hovertemplate=f"{x_label} = %{{x:.3e}}<br>{name} = %{{y:.10g}}<extra></extra>",
+        )
+        title = f"{name} against {x_label}" + (" (log scale)" if log_x or log_y else "")
+        layout = _layout(title, x_label, name, showlegend=False)
+        if log_x:
+            _log_axis(layout["xaxis"])
+        if log_y:
+            _log_axis(layout["yaxis"])
+        figures.append(_figure(f"convergence_{key}", title, [trace], layout))
+    if bool(data.option("changes", True)):
+        traces: list[dict[str, Any]] = []
+        for slot, key in enumerate(y_keys):
+            label = data.label(key)
+            ys = _column(data.steps, key)
+            changes: list[float | None] = [
+                None if a is None or b is None else abs(b - a) for a, b in itertools.pairwise(ys)
+            ]
+            traces.append(
+                _line(
+                    f"|change of {label}|",
+                    shown_x[: len(changes)],
+                    _positive(changes),
+                    slot,
+                    hovertemplate=f"{x_label} = %{{x:.3e}}<br>|change of {label}| = "
+                    "%{y:.3e}<extra></extra>",
+                )
+            )
+        title = "Row-to-row change (log)"
+        layout = _layout(title, x_label, "|y(next row) - y(row)|")
+        if log_x:
+            _log_axis(layout["xaxis"])
+        _log_axis(layout["yaxis"])
+        figures.append(_figure("convergence_changes", title, traces, layout))
+    return figures
+
+
 def _as_mapping(item: object) -> Mapping[str, Any] | None:
     if isinstance(item, Mapping):
         return item
@@ -531,8 +621,7 @@ def _delta_figure(
     title = f"{label} per iteration, by factor" + (" (log scale)" if log else "")
     layout = _layout(title, "iteration within factor", label)
     if log:
-        layout["yaxis"]["type"] = "log"
-        layout["yaxis"]["exponentformat"] = "power"
+        _log_axis(layout["yaxis"])
     return _figure("factors_delta", title, traces, layout)
 
 
@@ -741,6 +830,7 @@ CHART_BUILDERS: Mapping[str, Callable[[ChartInput], list[Figure]]] = {
     "integrand_panels": integrand_panels_figures,
     "factors": factors_figures,
     "interpolant": interpolant_figures,
+    "convergence": convergence_figures,
 }
 """Builder per catalog ``[chart] kind``."""
 

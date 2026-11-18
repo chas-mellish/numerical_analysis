@@ -30,9 +30,10 @@ at `/programs/<id>`.
 | `ch01_p02` | Ch. 1, Prog. 2, p. 25 | Bairstow quadratic factors | [yes](docs/chapter_01_program_02_listing.pdf) | [`ch01_p02_bairstow`](fortran/app/ch01_p02_bairstow.f90) | `gerald_na.algorithms.bairstow:bairstow` | [content/ch01_p02.md](content/ch01_p02.md) |
 | `ch03_p01` | Ch. 3, Prog. 1, p. 73 | Simpson's 1/3 rule, Si(B) | [yes](docs/chapter_03_program_01_listing.pdf) | [`ch03_p01_simpson`](fortran/app/ch03_p01_simpson.f90) | `gerald_na.algorithms.simpson:simpson` | [content/ch03_p01.md](content/ch03_p01.md) |
 | `ch03_p02` | Ch. 3, Prog. 2, p. 74 | Romberg integration, Si(B) | [yes](docs/chapter_03_program_02_listing.pdf) | [`ch03_p02_romberg`](fortran/app/ch03_p02_romberg.f90) | `gerald_na.algorithms.romberg:romberg` | [content/ch03_p02.md](content/ch03_p02.md) |
+| `ch04_p01` | Ch. 4, Prog. 1, p. 90 | Derivatives by central differences | [yes](legacy_code/fortran/chapter_4/derivatives.pdf) | [`ch04_p01_central_difference`](fortran/app/ch04_p01_central_difference.f90) | `gerald_na.algorithms.central_difference:central_difference` | [content/ch04_p01.md](content/ch04_p01.md) |
 | `lagrange_interpolation` | unconfirmed | Lagrangian interpolation | **no** | [`lagrange_interpolation`](fortran/app/lagrange_interpolation.f90) | `gerald_na.algorithms.lagrange:lagrange` | [content/lagrange_interpolation.md](content/lagrange_interpolation.md) |
 
-5 programs. Without a scan: `lagrange_interpolation`. Book reference unconfirmed: `lagrange_interpolation`.
+6 programs. Without a scan: `lagrange_interpolation`. Book reference unconfirmed: `lagrange_interpolation`.
 <!-- PROGRAM_INDEX_END -->
 
 ### Missing scans and programs not yet migrated
@@ -43,14 +44,16 @@ at `/programs/<id>`.
   `book_ref_confirmed = false` and no `scan_pdf`; the web page shows "no scan available", and its
   corrections are justified by syntax, FORMAT Hollerith counts and the printed result 2.3119. When
   a scan turns up, the reference can be confirmed in the catalog without renaming any file.
-* **Chapters 1 and 3 are the only scans in this branch**: the four listing PDFs in `docs/`
-  (`chapter_01_program_01/02`, `chapter_03_program_01/02`).
-* **Chapters 4 and 5 exist upstream but are not migrated.** Upstream `main` (commit `da49d01`)
-  adds `legacy_code/fortran/chapter_4/derivatives.pdf`,
-  `legacy_code/fortran/chapter_4/derivatives_log_example.pdf` and
-  `legacy_code/fortran/chapter_5/integration_methods.pdf`. They are not merged into this branch,
-  not catalogued and not migrated (they are outside the specified program list); `gerald-na
-  catalog check` ignores files that no catalog entry references, so they cannot break it.
+* **Scanned listings.** Chapters 1 and 3 are the four listing PDFs in `docs/`
+  (`chapter_01_program_01/02`, `chapter_03_program_01/02`). Chapter 4, Program 1 (central
+  differences, book p. 90) is scanned in `legacy_code/fortran/chapter_4/derivatives.pdf` and
+  catalogued as `ch04_p01`; it has no OCR text, so its listing was transcribed from the scan.
+* **Scanned pages without a program listing.** Two scans hold no program: Chapter 4 p. 91
+  (`legacy_code/fortran/chapter_4/derivatives_log_example.pdf`, problems 2-7 of chapter 4; its
+  problem 2 is used by the `ch04_p01` practice questions and preset 3) and Chapter 5 p. 106
+  (`legacy_code/fortran/chapter_5/integration_methods.pdf`, a summary of the trapezoidal,
+  Simpson, Milne and Adams formulas with their error terms, cited on the `ch04_p01` study page).
+  Neither is a program to migrate; Chapter 5's programs are not scanned yet.
 * **Chapters 6 to 8 are not scanned yet** (the repository history says the code for the later
   chapters will be uploaded once scanned).
 

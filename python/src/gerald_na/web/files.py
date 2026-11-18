@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from gerald_na.registry import CatalogPathError
-from gerald_na.web.services import SERVED_FILE_KINDS, ProgramNotFound
+from gerald_na.web.services import SERVED_FILE_KINDS, ProgramNotFound, is_pdf_path
 from gerald_na.web.templating import get_state
 
 __all__ = ["router"]
@@ -39,7 +39,7 @@ def program_file(
         path = state.resolve_file(entry, kind, int(index))
     except ProgramNotFound, CatalogPathError:
         raise HTTPException(status_code=404, detail="file not found") from None
-    media_type = "application/pdf" if kind == "scan" else TEXT_PLAIN
+    media_type = "application/pdf" if kind == "scan" or is_pdf_path(path) else TEXT_PLAIN
     return FileResponse(
         path,
         media_type=media_type,

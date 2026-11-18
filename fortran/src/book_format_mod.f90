@@ -10,6 +10,13 @@
 !>   fit still prints as asterisks, as `Fw.d` requires.
 !> * `book_fixed_nearest` is the same field rounded to nearest (the `RN` edit mode), for the
 !>   echoes of data-card values, which the book printed as the exact card digits.
+!> * `book_e` renders the `Ew.d` fields of the Chapter 4 printouts as the scan shows them: one
+!>   digit before the decimal point (modern `ESw.d`, the scan's `1.0016675E-02`), under the
+!>   rounding edit mode `mode` (`RZ` for computed values, `RN` for echoes), and an exact zero with
+!>   the exponent `E-99` (`0.0000000E-99`, the floating-point zero of the book's machine) instead
+!>   of `E+00`; a negative zero keeps its sign.
+!> * `fixed_leading_zero` is `Fw.d` under `mode` with the leading zero of a value below one kept
+!>   whenever the field has room for it (Chapter 4 prints `AT X =  0.00`).
 !> * `trace_real`, `trace_int`, `trace_logical` render values for the `--trace` protocol (DD2):
 !>   reals with `ES25.17E3` (leading blanks removed), integers with `I0`, logicals `T`/`F`.
 !> * `no_commas` makes message text safe for a trace record: commas are the protocol's field
@@ -19,8 +26,8 @@ module book_format_mod
    implicit none
    private
 
-   public :: book_fixed, book_fixed_nearest, book_int, trace_real, trace_int, trace_logical, &
-      no_commas
+   public :: book_fixed, book_fixed_nearest, book_e, fixed_leading_zero, book_int, trace_real, &
+      trace_int, trace_logical, no_commas
 
 contains
 
@@ -65,6 +72,46 @@ contains
          end if
       end if
    end function fixed_point
+
+   !> Book-style `Ew.d` of Chapter 4: `ESw.d` under the rounding mode `mode` (`RZ` or `RN`), an
+   !> exact zero printed with the exponent `E-99` (`-0.0000000E-99` for a negative zero).
+   function book_e(x, w, d, mode) result(s)
+      real(wp), intent(in) :: x
+      integer, intent(in) :: w, d
+      character(len=2), intent(in) :: mode
+      character(len=w) :: s
+      character(len=32) :: fmt
+      integer :: p
+
+      write (fmt, '("(", A, ",ES", I0, ".", I0, ")")') mode, w, d
+      write (s, fmt) x
+      if (.not. (x > 0.0_wp .or. x < 0.0_wp)) then
+         p = index(s, "E+00", back=.true.)
+         if (p >= 1) s(p:p + 3) = "E-99"
+      end if
+   end function book_e
+
+   !> `Fw.d` under the rounding edit mode `mode` (`RZ` or `RN`) with a leading zero before the
+   !> decimal point of a value below one whenever the field has room for it (`0.00`, `-0.50`).
+   function fixed_leading_zero(x, w, d, mode) result(s)
+      real(wp), intent(in) :: x
+      integer, intent(in) :: w, d
+      character(len=2), intent(in) :: mode
+      character(len=w) :: s
+      character(len=32) :: fmt
+      integer :: p
+
+      write (fmt, '("(", A, ",F", I0, ".", I0, ")")') mode, w, d
+      write (s, fmt) x
+      ! The zero before the point is optional in Fw.d; insert it where the processor left it out
+      ! (point at the start of the digits) and the field has a leading blank to absorb it.
+      p = index(s, ".")
+      if (p >= 2 .and. s(1:1) == " ") then
+         if (s(p - 1:p - 1) == " " .or. s(p - 1:p - 1) == "-") then
+            s = s(2:p - 1)//"0"//s(p:)
+         end if
+      end if
+   end function fixed_leading_zero
 
    !> `Iw` edit descriptor, for the book's integer fields (for example `I3`).
    function book_int(i, w) result(s)

@@ -34,15 +34,15 @@ class TestCatalog:
         res = run_cli("catalog", "list")
         evidence(stdout=res.stdout, exit_code=res.returncode, args="catalog list")
         assert res.returncode == 0
-        for pid in ("ch01_p01", "ch01_p02", "ch03_p01", "ch03_p02", "lagrange_interpolation"):
+        for pid in ("ch01_p01", "ch01_p02", "ch03_p01", "ch03_p02", "ch04_p01", "lagrange_interpolation"):
             assert pid in res.stdout
-        assert "5 program(s)" in res.stdout
+        assert "6 program(s)" in res.stdout
 
     def test_cli_catalog_check(self, evidence):
         res = run_cli("catalog", "check")
         evidence(stdout=res.stdout, stderr=res.stderr, exit_code=res.returncode, args="catalog check")
         assert res.returncode == 0
-        assert "catalog OK: 5 program(s)" in res.stdout
+        assert "catalog OK: 6 program(s)" in res.stdout
 
     def test_cli_catalog_index_check(self, evidence):
         res = run_cli("catalog", "index", "--check")

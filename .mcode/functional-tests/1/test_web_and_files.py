@@ -16,7 +16,7 @@ class TestHtmlPages:
         resp = requests.get(f"{BASE_URL}/", timeout=10)
         evidence(status=resp.status_code, body=resp.text[:2500], endpoint="/", method="GET")
         assert resp.status_code == 200
-        for pid in ("ch01_p01", "ch01_p02", "ch03_p01", "ch03_p02", "lagrange_interpolation"):
+        for pid in ("ch01_p01", "ch01_p02", "ch03_p01", "ch03_p02", "ch04_p01", "lagrange_interpolation"):
             assert f"/programs/{pid}" in resp.text
 
     def test_html_program_page(self, evidence):

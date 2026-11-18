@@ -34,6 +34,7 @@ CHART_FIGURES: Mapping[str, set[str]] = {
     "integrand_panels": {"integrand_panels"},
     "factors": {"factors_r", "factors_s", "factors_roots"},
     "interpolant": {"interpolant"},
+    "convergence": {"convergence_changes"},
 }
 """Figures every chart kind must produce for a successful run."""
 

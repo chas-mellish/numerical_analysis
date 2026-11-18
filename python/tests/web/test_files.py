@@ -1,10 +1,13 @@
 """``GET /files/{program_id}/{kind}``: whitelist, content types and traversal attempts."""
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
-from gerald_na.registry import get_registry
-from tests.web.conftest import BISECTION
+from gerald_na.registry import Registry, get_registry
+from gerald_na.web.app import create_app
+from tests.web.conftest import BISECTION, LAGRANGE_TOML, make_settings
 
 
 def test_scan_is_pdf(client: TestClient) -> None:
@@ -70,3 +73,35 @@ def test_missing_scan_and_missing_files(synthetic_client: TestClient) -> None:
     response = synthetic_client.get("/files/synthetic_points/legacy")
     assert response.status_code == 200
     assert "PROGRAM LAGRAN" in response.text
+
+
+def test_legacy_pdf_is_served_as_pdf_and_linked_not_shown(
+    clean_env: pytest.MonkeyPatch, synthetic_repo: Path
+) -> None:
+    """A legacy file that is a scanned page (no OCR text) is linked, not dumped as text."""
+    catalog = synthetic_repo / "catalog" / "synthetic_points.toml"
+    catalog.write_text(
+        LAGRANGE_TOML.replace(
+            'legacy = ["legacy_code/fortran/chapter_2/lagrange.f90"]',
+            'legacy = ["legacy_code/fortran/chapter_2/lagrange.f90",'
+            ' "legacy_code/fortran/chapter_2/page.PDF"]',
+        ),
+        encoding="utf-8",
+    )
+    (synthetic_repo / "legacy_code" / "fortran" / "chapter_2" / "page.PDF").write_bytes(
+        b"%PDF-1.4\n\xff\xfe binary\n"
+    )
+    client = TestClient(
+        create_app(make_settings(synthetic_repo), registry=Registry.load(synthetic_repo))
+    )
+    response = client.get("/files/synthetic_points/legacy?index=1")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    text = client.get("/files/synthetic_points/legacy").headers["content-type"]
+    assert text.startswith("text/plain")
+    html = client.get("/programs/synthetic_points").text
+    assert 'data-testid="legacy-source-0"' in html
+    assert 'data-testid="legacy-source-1-pdf"' in html
+    assert 'data-testid="legacy-source-1"' not in html
+    assert 'href="/files/synthetic_points/legacy?index=1"' in html
+    assert "binary" not in html

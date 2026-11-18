@@ -327,3 +327,55 @@ def test_axis_label_and_sample_options() -> None:
     )[0]
     assert len(by_name(interpolant, "Lagrange polynomial")["x"]) == 11
     assert interpolant["layout"]["yaxis"]["title"]["text"] == "Y"
+
+
+DERIVATIVE_STEPS = [
+    {"k": 1, "h": 0.1, "dx": 0.010016675, "ddx": 2.0100083},
+    {"k": 2, "h": 0.01, "dx": 1.0000167e-4, "ddx": 2.0001},
+    {"k": 3, "h": 0.001, "dx": 0.0, "ddx": 2.0001},
+]
+
+
+def test_convergence_values_and_changes() -> None:
+    data = ChartInput(
+        kind="convergence",
+        options={"x_key": "h", "y_keys": ["dx", "ddx"], "log_y_keys": ["dx"]},
+        steps=DERIVATIVE_STEPS,
+        labels={"h": "H", "dx": "DX", "ddx": "DDX"},
+    )
+    dx, ddx, changes = build_figures(data)
+    assert [dx["id"], ddx["id"], changes["id"]] == [
+        "convergence_dx",
+        "convergence_ddx",
+        "convergence_changes",
+    ]
+    assert dx["layout"]["xaxis"]["type"] == "log"
+    assert dx["layout"]["yaxis"]["type"] == "log"
+    assert traces(dx)[0]["name"] == "|DX|"
+    assert traces(dx)[0]["y"] == [0.010016675, 1.0000167e-4, None]  # exact zero left out
+    assert "type" not in ddx["layout"]["yaxis"]
+    assert traces(ddx)[0]["y"] == [2.0100083, 2.0001, 2.0001]
+    assert traces(ddx)[0]["x"] == [0.1, 0.01, 0.001]
+    change_dx = by_name(changes, "|change of DX|")
+    assert change_dx["x"] == [0.1, 0.01]
+    assert change_dx["y"] == pytest.approx([0.010016675 - 1.0000167e-4, 1.0000167e-4])
+    assert by_name(changes, "|change of DDX|")["y"][1] is None  # no change: nothing on log axes
+    assert changes["layout"]["yaxis"]["type"] == "log"
+    json.dumps([dx, ddx, changes], allow_nan=False)
+
+
+def test_convergence_linear_axes_without_x_column_or_changes() -> None:
+    steps = [{"v": 3.0}, {"v": -1.0}]
+    data = ChartInput(
+        kind="convergence",
+        options={"y_keys": "v", "log_x": False, "changes": False},
+        steps=steps,
+    )
+    (figure,) = build_figures(data)
+    assert figure["id"] == "convergence_v"
+    assert traces(figure)[0]["x"] == [1.0, 2.0]  # row numbers when x_key is absent
+    assert traces(figure)[0]["y"] == [3.0, -1.0]
+    assert "type" not in figure["layout"]["xaxis"]
+    assert figure["layout"]["xaxis"]["title"]["text"] == "row"
+    bad = ChartInput(kind="convergence", options={"y_keys": 3})
+    assert [f["id"] for f in build_figures(bad)] == ["convergence_changes"]

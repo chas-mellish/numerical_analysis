@@ -14,6 +14,11 @@ from gerald_na.algorithms.bairstow import (
     factor_roots,
 )
 from gerald_na.algorithms.bisection import BisectionResult, BisectionStep, bisection
+from gerald_na.algorithms.central_difference import (
+    CentralDifferenceResult,
+    CentralDifferenceStep,
+    central_difference,
+)
 from gerald_na.algorithms.lagrange import LagrangeResult, LagrangeStep, lagrange
 from gerald_na.algorithms.romberg import RombergResult, RombergStep, romberg
 from gerald_na.algorithms.simpson import SimpsonResult, SimpsonStep, simpson
@@ -24,6 +29,8 @@ __all__ = [
     "BairstowStep",
     "BisectionResult",
     "BisectionStep",
+    "CentralDifferenceResult",
+    "CentralDifferenceStep",
     "LagrangeResult",
     "LagrangeStep",
     "RombergResult",
@@ -33,6 +40,7 @@ __all__ = [
     "SimpsonStep",
     "bairstow",
     "bisection",
+    "central_difference",
     "factor_roots",
     "format_e",
     "format_es",
