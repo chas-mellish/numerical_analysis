@@ -66,19 +66,20 @@ def index_in(root, *args):
 
 # =========================================================================== catalog index CLI
 class TestCatalogIndexCli:
-    def test_m13_index_prints_both_blocks(self, evidence):
+    def test_m13_index_prints_the_program_index(self, evidence):
         r = run_cli("catalog", "index")
         evidence(exit_code=r.returncode, stdout=r.stdout, stderr=r.stderr, command="catalog index")
         assert r.returncode == 0, r.stderr
         text = readme_text()
         idx = block(text, IDX_START, IDX_END).lstrip("\n")
-        run = block(text, RUN_START, RUN_END).lstrip("\n")
-        # The index, a blank line, then the run commands, identical to the README blocks.
-        assert r.stdout == idx + "\n" + run
+        # Bare `catalog index` prints exactly the program index (origin
+        # behaviour). The RUN_COMMANDS block is written/checked by
+        # --write / --check, not printed by default.
+        assert r.stdout == idx
         assert "| Program id | Book reference |" in r.stdout
-        assert "printf '0.        1.        1.E-5\\n' | build/bin/ch01_p01_bisection" in r.stdout
-        assert "uv run gerald-na run lagrange_interpolation" in r.stdout
-        assert "| Program id | Quantity | Book | real64 | What the book prints |" in r.stdout
+        assert "build/bin/ch01_p01_bisection" not in r.stdout
+        assert "uv run gerald-na run lagrange_interpolation" not in r.stdout
+        assert "| Program id | Quantity | Book | real64 | What the book prints |" not in r.stdout
 
     def test_m13_index_check_up_to_date(self, evidence):
         r = run_cli("catalog", "index", "--check")

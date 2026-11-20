@@ -287,13 +287,18 @@ def _scratch_repo(tmp_path: Path, repo_root: Path) -> Path:
     return root
 
 
-def test_cli_catalog_index_prints_the_index(capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_catalog_index_prints_the_index(
+    capsys: pytest.CaptureFixture[str], registry: Registry
+) -> None:
     assert main(["catalog", "index"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("| Program id | Book reference |")
     assert "`lagrange_interpolation` | unconfirmed" in out
-    assert "| build/bin/ch01_p01_bisection\n" in out
-    assert "uv run gerald-na run lagrange_interpolation\n" in out
+    # Bare `catalog index` prints only the program index; RUN_COMMANDS is
+    # produced by --write / --check, matching origin behaviour.
+    assert out == render_program_index(registry)
+    assert "build/bin/ch01_p01_bisection" not in out
+    assert "uv run gerald-na run lagrange_interpolation" not in out
 
 
 def test_cli_catalog_index_check_names_a_stale_run_commands_block(

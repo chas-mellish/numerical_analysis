@@ -164,15 +164,12 @@ def _catalog_index(args: argparse.Namespace) -> int:
     from gerald_na.registry.generated import (
         generated_files,
         render_program_index,
-        render_run_commands,
     )
 
     try:
         registry = Registry.load(get_settings().repo_root)
         if not (args.check or args.write):
             sys.stdout.write(render_program_index(registry))
-            sys.stdout.write("\n")
-            sys.stdout.write(render_run_commands(registry))
             return 0
         files = generated_files(registry)
     except CatalogError as exc:

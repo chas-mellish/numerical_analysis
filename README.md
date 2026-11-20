@@ -757,7 +757,7 @@ example with its output is in [Python port](#python-port).
 ```sh
 uv run gerald-na catalog list            # id, book reference, scan, title
 uv run gerald-na catalog check           # every entry valid and every referenced file present (exit 1 otherwise)
-uv run gerald-na catalog index           # print both README blocks: the program index, a blank line, then the run commands
+uv run gerald-na catalog index           # print the README program index
 uv run gerald-na catalog index --check   # exit 1 if a README block (program index, run commands) or a study page's errata table is stale
 uv run gerald-na catalog index --write   # regenerate the stale blocks (make readme-index)
 ```
