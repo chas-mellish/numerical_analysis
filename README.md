@@ -16,6 +16,76 @@ Each program is described once in a shared catalog (`catalog/*.toml`); the UI, t
 engines and the program index below read it. The original OCR transcriptions in `legacy_code/` and
 the scans in `docs/*.pdf` are kept unchanged as the reference.
 
+## Getting started
+
+### What you need
+
+Choose one of two paths:
+
+* **Docker only** (simplest). The image contains the whole toolchain, builds the Fortran drivers
+  and serves the web tool on port 8000:
+
+  ```sh
+  docker build -t gerald-na .
+  docker run --rm -p 8000:8000 gerald-na
+  ```
+
+  Then open <http://127.0.0.1:8000>. The image has a `HEALTHCHECK` on `/healthz`; see
+  [Docker](#docker) for what is inside it.
+* **Local**. You need GNU make, [uv](https://docs.astral.sh/uv/) (it installs Python 3.15 itself)
+  and, for the Fortran engine, gfortran 16 and fpm 0.13. LLVM flang is optional (a second
+  compiler check). Exact versions are in [Prerequisites](#prerequisites); a ready-made editor
+  environment is in [Devcontainer](#devcontainer).
+
+  **Without gfortran the Python engine, the CLI and the web UI still work.** The Fortran engine
+  then shows as unavailable: `/healthz` reports `"fortran":false`, and on a program page the
+  "Fortran (compiled book driver)" and "Compare Python and Fortran" choices are disabled with a
+  note such as
+  ``Unavailable: Fortran driver ch01_p01_bisection is not built in <dir> (run `make build-fortran`)``. `gerald-na run --engine fortran` prints the same message as an error
+  (exit status 2).
+
+### Quick start (local)
+
+1. **Get the code** and change into it:
+
+   ```sh
+   git clone <repository-url> numerical_analysis
+   cd numerical_analysis
+   ```
+
+2. **Install the Python environment**: `make sync` (runs `uv sync` in `python/` and creates
+   `python/.venv`). To check it, run `uv --directory python run gerald-na --version`, which prints
+   `gerald-na 0.1.0`.
+
+3. **Build the Fortran drivers**: `make build-fortran` (needs gfortran and fpm; skip it to use the
+   Python engine only). fpm builds with warnings treated as errors and installs the six
+   executables. To check it, run `ls build/bin`, which lists:
+
+   ```
+   ch01_p01_bisection  ch01_p02_bairstow  ch03_p01_simpson  ch03_p02_romberg
+   ch04_p01_central_difference  lagrange_interpolation
+   ```
+
+4. **Start the web tool**: `make serve`. Uvicorn reports
+
+   ```
+   INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+   ```
+
+5. **Open <http://127.0.0.1:8000>**. The home page, titled "Programs", lists the programs by
+   chapter. To check the server from another terminal:
+
+   ```sh
+   curl http://127.0.0.1:8000/healthz
+   # {"status":"ok","version":"0.1.0","engines":{"python":true,"fortran":true}}
+   ```
+
+   `"fortran":false` means step 3 was skipped or failed.
+
+Next: [Running the programs](#running-the-programs) shows how to run each book program from the
+command line. [Setup](#setup) and [Lifecycle targets](#lifecycle-targets) cover tests, the
+single-precision build and the remaining make targets.
+
 ## Programs
 
 The index is generated from the catalog by `make readme-index` (`gerald-na catalog index --write`);
@@ -60,6 +130,149 @@ at `/programs/<id>`.
 New programs follow the checklist in [Adding a program](#adding-a-program).
 
 ## Running the programs
+
+Every program can be run in two ways: as the compiled Fortran driver (the modernized original
+program) or through the Python port. A copy-paste command for each program, and the values it
+should print, are in [the generated list](#commands-and-expected-results-for-every-program) at the
+end of this section.
+
+### Compiled Fortran drivers
+
+After `make build-fortran`, each driver in `build/bin/` reads the book's data card from standard
+input, in the book's original card order, and prints the book's line-printer output. The input is
+read list-directed, so the card as printed in the book works unchanged; any spacing will do. Run
+the drivers from the repository root:
+
+```sh
+$ printf '0. 1. 1.E-5\n' | build/bin/ch01_p01_bisection
+ AT X =   .5000000 F(X) =   -.100576
+ AT X =   .2500000 F(X) =    .396117
+ ...
+ AT X =   .4435729 F(X) =    .000000
+ THE VALUE, X =   .4435729 IS A ROOT.  15 ITERATIONS WERE REQUIRED.
+```
+
+`sample_input.txt` in the repository root holds Bairstow's two data cards (the coefficients, then
+`R1 S1 TEST LIM N`):
+
+```sh
+$ build/bin/ch01_p02_bairstow < sample_input.txt
+ ...
+ THE QUADRATIC FACTORS ARE-
+
+ X**2 +    4.19999 X +   -2.09999
+ X**2 +    3.30000 X +   -6.20000
+    1.00000X +  -10.30000
+```
+
+What to look for with the book's data cards (default real64 build):
+
+* **ch01_p01, bisection**: root `.4435729` after 15 iterations, as in the book. The last F(X) row
+  prints `.000000`, while the scan prints `.000001`.
+* **ch01_p02, Bairstow**: the factors x² + 4.2x − 2.1, x² + 3.3x − 6.2 and x − 10.3, printed with
+  chopped digits. The real64 build prints `3.30000` for the second factor where the book prints
+  `3.29999`. The other digits match the book.
+* **ch03_p01, Simpson**: Si(5) = `1.5499312` with 100 panels; the book prints `1.5499307`.
+* **ch03_p02, Romberg**: Si(15) = `1.6181944` with 80 subintervals; the book prints `1.6181936`.
+* **ch04_p01, central differences**: the first row (`1.0016675E-02`, `2.0100083E+00`) matches the
+  book. For small H the real64 DX keeps its digits (`1.0000000E-20` in the last row), while the
+  book prints `0.0000000E-99`.
+* **lagrange_interpolation**: `2.3119` at X = 5.000, as in the book.
+
+These differences come from the arithmetic of the book's machine, not from errors in the programs.
+Each study page explains them in its "Precision" section (for example
+[content/ch03_p01.md](content/ch03_p01.md#precision)).
+
+### Driver options
+
+| Flag | Effect | Accepted by |
+|---|---|---|
+| `--trace` | machine-readable records only, no book text: `STEP` records, then `RESULT` or `ERROR` (Bairstow adds `FACTOR` and Romberg `TABLE` records); exit status 2 on `ERROR` | all six drivers |
+| `--verbose` | extras after the book text, under the heading `VERBOSE OUTPUT (NOT PART OF THE BOOK TEXT)`: the working precision, the data card at full precision and program details (e.g. Bairstow's true factors and roots, Lagrange's terms) | all six drivers |
+| `--preset N` | the function to use, from the book's function presets (default 1 = the book's function); the list is in each driver's `--help` | bisection, Simpson, Romberg, central differences (not Bairstow or Lagrange, which take data rather than a function) |
+| `--help` | usage text, including the preset list | all six drivers |
+
+Without flags the exit status is 0 on success and 1 when the program stops on one of the book's
+error paths (the book's message is printed) or the input is invalid. The record format is
+specified in [docs/architecture.md, "DD2: Trace protocol"](docs/architecture.md#dd2-trace-protocol---trace).
+
+```sh
+$ printf '0. 1. 1.E-5\n' | build/bin/ch01_p01_bisection --trace
+STEP,k=1,x1=0.00000000000000000E+000,x2=1.00000000000000000E+000,x=5.00000000000000000E-001,fx=-1.00576112000487550E-001
+...
+RESULT,value=4.43572998046875000E-001,converged=T,iterations=15,root_at_endpoint=F,fx1=1.00000000000000000E+000,fx2=-6.32120558828557333E-001
+
+$ printf '0.5 1. 1.E-5\n' | build/bin/ch01_p01_bisection --trace     # no sign change: exit status 2
+ERROR,code=BRACKET,message=FUNCTION VALUES WITH INITIAL X VALUES ARE NOT OF OPPOSITE SIGNS. CHANGE INPUTS.
+
+$ printf '1. 2. 1.E-5\n' | build/bin/ch01_p01_bisection --preset 2   # X**3 - X - 1
+ ...
+ THE VALUE, X =  1.3247184 IS A ROOT.  18 ITERATIONS WERE REQUIRED.
+
+$ printf '1.0 10\n' | build/bin/ch03_p01_simpson --preset 3          # 1/(1+X**2) on [0, 1]
+ VALUE OF SINE INTEGRAL FROM X = 0 TO X =  1.00 IS  .7853981 WITH  10 PANELS
+```
+
+The book's heading is printed unchanged for every preset, so the Simpson line still says "SINE
+INTEGRAL" for 1/(1+x²) (π/4 = 0.78539816…).
+
+### Single-precision build
+
+`make build-fortran-single` builds the same drivers in real32 (`-DSINGLE`), which is closer to the
+book's single-precision machine, and installs them into `build/single/bin/`. Some of the book's
+digits then reappear. For central differences, the last three DX values become exactly zero, as in
+the book:
+
+```sh
+$ printf '0.0 0.1\n' | build/single/bin/ch04_p01_central_difference
+ ...
+  1.0E-07      8.4703277E-15      2.0000000E+00
+  1.0E-08      0.0000000E-99      2.0000000E+00
+  1.0E-09      0.0000000E-99      2.0000000E+00
+  1.0E-10      0.0000000E-99      2.0000000E+00
+```
+
+The real32 bisection run also prints the scan's `.000001` in its last row. Single precision does
+not reproduce every book digit, though. Simpson prints `1.5499314` in real32 and Romberg
+`1.6181944`, against the book's `1.5499307` and `1.6181936`. The book's machine chopped its results
+instead of rounding them, so its errors accumulate in one direction, while IEEE arithmetic (real32
+or real64) rounds to nearest. The study pages' "Precision" sections
+([ch03_p01](content/ch03_p01.md#precision), [ch03_p02](content/ch03_p02.md#precision),
+[ch04_p01](content/ch04_p01.md#precision)) compare the builds with emulations of the book's
+machine.
+
+### Python port
+
+From `python/`, `uv run gerald-na run <id>` runs a program on the Python engine with the book's data
+card and prints the same book text. Add `--engine fortran` to run the compiled driver instead, or
+`--engine compare` to run both and compare their traces:
+
+```sh
+$ uv run gerald-na run ch03_p01 --engine compare     # timings vary
+=== python: OK (0.4 ms)
+VALUE OF SINE INTEGRAL FROM X = 0 TO X =  5.00 IS 1.5499312 WITH 100 PANELS
+=== fortran: OK (8.9 ms)
+VALUE OF SINE INTEGRAL FROM X = 0 TO X =  5.00 IS 1.5499312 WITH 100 PANELS
+=== differences
+same outcome: True  same iterations: True
+       K: max abs 0.000e+00  max rel 0.000e+00  first differing row -
+...
+```
+
+`--expr` replaces the program's function with your own. It runs on the Python engine only;
+`--engine fortran` with `--expr` is refused with exit status 2. Old FORTRAN names such as `EXPF` and
+`SINF` are accepted, in either case.
+
+```sh
+$ uv run gerald-na run ch01_p01 --expr 'x**3 - 2' --input x1=1 --input x2=2
+...
+THE VALUE, X =  1.2599220 IS A ROOT.  18 ITERATIONS WERE REQUIRED.
+```
+
+`--input name=value`, `--preset N`, `--verbose`, `--trace-json` and the other options are listed in
+[Command line](#command-line).
+
+### Commands and expected results for every program
 
 The block below is generated from the catalog by `make readme-index`; do not edit it by hand.
 
