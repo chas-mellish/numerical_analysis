@@ -95,11 +95,11 @@
       {% set blocked = (not status.available) or (custom and name != "python") %}
       <div class="engine-option">
         <input type="radio" id="engine-{{ name }}" name="engine" value="{{ name }}"
-               {% if values.engine == name and not blocked %}checked{% endif %}
-               {% if blocked %}disabled{% endif %}
-               {% if not status.available %}data-unavailable="true"{% endif %}
-               {% if name != "python" %}data-needs-preset="true"{% endif %}
-               data-testid="engine-{{ name }}">
+               {% if values.engine == name and not blocked %} checked{% endif %}
+               {% if blocked %} disabled{% endif %}
+               {% if not status.available %} data-unavailable="true"{% endif %}
+               {% if name != "python" %} data-needs-preset="true"{% endif %}
+               {{- " " }}data-testid="engine-{{ name }}">
         <label for="engine-{{ name }}">{{ label }}</label>
         {% if not status.available %}<p class="engine-note" data-testid="engine-note-{{ name }}">Unavailable: {{ status.reason }}</p>{% endif %}
       </div>

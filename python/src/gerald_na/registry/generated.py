@@ -1,9 +1,13 @@
-"""Markdown generated from the catalog: the README program index and the study-page errata tables.
+"""Markdown generated from the catalog: the README program index and run commands, and the
+study-page errata tables.
 
 The catalog is the single source of truth (DD9), so text that restates it is generated rather
 than edited by hand. Each generated block sits between two HTML-comment markers in its file:
 
-* ``README.md``: :data:`INDEX_START` / :data:`INDEX_END` hold :func:`render_program_index`;
+* ``README.md``: :data:`INDEX_START` / :data:`INDEX_END` hold :func:`render_program_index`, and
+  :data:`RUN_COMMANDS_START` / :data:`RUN_COMMANDS_END` hold :func:`render_run_commands` (a
+  copy-paste command per program for the compiled Fortran driver, fed the catalog's data card,
+  and for the Python port, plus the catalog's expected results);
 * every study page (``content/*.md``): :data:`ERRATA_START` / :data:`ERRATA_END` hold
   :func:`render_errata_table` for that program, so the table carries every catalog erratum with
   its id, kind and wording.
@@ -18,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from gerald_na.registry.loader import CatalogError, Registry
-from gerald_na.registry.models import CatalogEntry, ErratumKind
+from gerald_na.registry.models import BookValue, CatalogEntry, ErratumKind, Expected
 
 __all__ = [
     "ERRATA_END",
@@ -27,18 +31,26 @@ __all__ = [
     "INDEX_START",
     "KIND_LABELS",
     "README_PATH",
+    "RUN_COMMANDS_END",
+    "RUN_COMMANDS_START",
     "GeneratedBlockError",
     "GeneratedFile",
     "book_reference",
     "escape_cell",
+    "format_expected_value",
     "generated_files",
+    "printf_argument",
+    "printf_command",
     "render_errata_table",
     "render_program_index",
+    "render_run_commands",
     "replace_block",
 ]
 
 INDEX_START = "<!-- PROGRAM_INDEX_START -->"
 INDEX_END = "<!-- PROGRAM_INDEX_END -->"
+RUN_COMMANDS_START = "<!-- RUN_COMMANDS_START -->"
+RUN_COMMANDS_END = "<!-- RUN_COMMANDS_END -->"
 ERRATA_START = "<!-- ERRATA_TABLE_START -->"
 ERRATA_END = "<!-- ERRATA_TABLE_END -->"
 
@@ -118,6 +130,96 @@ def render_program_index(registry: Registry) -> str:
     return "\n".join(lines) + "\n"
 
 
+def printf_argument(card: str) -> str:
+    r"""``card`` as the single-quoted format argument of ``printf`` in ``sh``.
+
+    Leading and trailing blank lines are dropped; the remaining lines keep their column spacing
+    verbatim and each ends in ``\n``. ``\`` and ``%`` are doubled so ``printf`` prints them
+    literally, and ``'`` is written as ``'\''`` (close quote, escaped quote, reopen).
+    """
+    lines = card.splitlines()
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    escaped = (
+        line.replace("\\", "\\\\").replace("%", "%%").replace("'", "'\\''") for line in lines
+    )
+    return "'" + "".join(f"{line}\\n" for line in escaped) + "'"
+
+
+def printf_command(card: str, executable: str) -> str:
+    r"""The ``printf <arg> | build/bin/<executable>`` line for the README run block.
+
+    A ``--`` end-of-options marker is inserted when ``card``'s first non-blank line starts with
+    ``-``; without it, ``sh``'s ``printf`` would read the card as an option (e.g. ``-1.0``).
+    Current catalog cards all start with a digit, so no README output changes today.
+    """
+    arg = printf_argument(card)
+    end_of_options = "-- " if arg.startswith("'-") else ""
+    return f"printf {end_of_options}{arg} | build/bin/{executable}"
+
+
+def format_expected_value(value: BookValue) -> str:
+    """A scalar expected value as a code span: shortest round-trip ``repr`` for reals.
+
+    The drivers print these values truncated to their FORMAT width (round toward zero), so each
+    printed number is a prefix of the digits shown here (``0.443572998046875`` prints as
+    ``.4435729``, ``1.0000000031710762e-20`` as ``1.0000000E-20``).
+    """
+    if isinstance(value, str):
+        return escape_cell(value)
+    if isinstance(value, tuple):
+        return "-"
+    return f"`{value!r}`"
+
+
+def _expected_row(entry: CatalogEntry, expected: Expected) -> str:
+    if expected.kind in ("rows", "table"):
+        book = real64 = "-"
+    else:
+        book = format_expected_value(expected.book_value)
+        modern = expected.real64_value if expected.real64_value is not None else expected.book_value
+        real64 = format_expected_value(modern)
+    description = escape_cell(expected.description) if expected.description is not None else ""
+    return f"| `{entry.id}` | `{expected.name}` | {book} | {real64} | {description} |"
+
+
+def render_run_commands(registry: Registry) -> str:
+    """The README run commands: per program, in book order, the compiled Fortran driver fed the
+    catalog's data card, the Python-port command, and a table of the catalog's expected results.
+    """
+    lines = [
+        "Compiled Fortran drivers, from the repository root (each command feeds the catalog's "
+        "data card on standard input; use `build/single/bin/` for the single-precision build):",
+        "",
+        "```sh",
+    ]
+    for entry in registry.programs:
+        lines.append(f"# {entry.id}: {entry.title}")
+        lines.append(printf_command(entry.data_card.text, entry.files.fortran_executable))
+    lines += ["```", "", "Python port, from `python/` (the same data card is the default input):"]
+    lines += ["", "```sh"]
+    for entry in registry.programs:
+        lines.append(f"# {entry.id}: {entry.title}")
+        lines.append(f"uv run gerald-na run {entry.id}")
+    lines += [
+        "```",
+        "",
+        "Expected results from the catalog's `[[expected]]` entries. *Book* is the value "
+        "transcribed from the scan, *real64* the value of the default (double-precision) build; "
+        "the drivers print it truncated to the book's FORMAT, so their significant digits are the "
+        "leading digits of the value shown. Rows and tables are described in the last column.",
+        "",
+        "| Program id | Quantity | Book | real64 | What the book prints |",
+        "|---|---|---|---|---|",
+    ]
+    lines.extend(
+        _expected_row(entry, expected) for entry in registry.programs for expected in entry.expected
+    )
+    return "\n".join(lines) + "\n"
+
+
 def render_errata_table(entry: CatalogEntry) -> str:
     """The study-page errata table: every catalog erratum, in catalog order, verbatim."""
     if not entry.errata:
@@ -157,6 +259,11 @@ def replace_block(text: str, start: str, end: str, body: str, *, where: str) -> 
     return f"{head}{start}\n{body}{end}{tail}"
 
 
+def _block_name(start: str) -> str:
+    """``RUN_COMMANDS`` for ``<!-- RUN_COMMANDS_START -->``."""
+    return start.removeprefix("<!-- ").removesuffix(" -->").removesuffix("_START")
+
+
 @dataclass(frozen=True, slots=True)
 class GeneratedFile:
     """A file holding a generated block: its current and its expected content."""
@@ -165,6 +272,8 @@ class GeneratedFile:
     path: Path
     current: str
     expected: str
+    stale_blocks: tuple[str, ...] = ()
+    """Names of the out-of-date blocks (marker name without ``_START``, e.g. ``RUN_COMMANDS``)."""
 
     @property
     def stale(self) -> bool:
@@ -173,36 +282,41 @@ class GeneratedFile:
 
 
 def generated_files(registry: Registry) -> list[GeneratedFile]:
-    """README.md and every study page, with the content they should have.
+    """README.md (both of its blocks) and every study page, with the content they should have.
 
     Raises :class:`GeneratedBlockError` if a file lacks its markers, and :class:`CatalogError`
     if a file cannot be read.
     """
-    targets: list[tuple[str, Path, str, str, str]] = [
+    targets: list[tuple[str, Path, list[tuple[str, str, str]]]] = [
         (
             README_PATH.as_posix(),
             registry.repo_root / README_PATH,
-            INDEX_START,
-            INDEX_END,
-            render_program_index(registry),
+            [
+                (INDEX_START, INDEX_END, render_program_index(registry)),
+                (RUN_COMMANDS_START, RUN_COMMANDS_END, render_run_commands(registry)),
+            ],
         )
     ]
     targets.extend(
         (
             entry.files.study_page,
             registry.resolve_path(entry, "study"),
-            ERRATA_START,
-            ERRATA_END,
-            render_errata_table(entry),
+            [(ERRATA_START, ERRATA_END, render_errata_table(entry))],
         )
         for entry in registry.programs
     )
     result: list[GeneratedFile] = []
-    for relative, path, start, end, body in targets:
+    for relative, path, blocks in targets:
         try:
             current = path.read_text(encoding="utf-8")
         except OSError as exc:
             raise CatalogError(f"{relative}: cannot read: {exc}") from exc
-        expected = replace_block(current, start, end, body, where=relative)
-        result.append(GeneratedFile(relative, path, current, expected))
+        expected = current
+        stale_blocks: list[str] = []
+        for start, end, body in blocks:
+            replaced = replace_block(expected, start, end, body, where=relative)
+            if replaced != expected:
+                stale_blocks.append(_block_name(start))
+            expected = replaced
+        result.append(GeneratedFile(relative, path, current, expected, tuple(stale_blocks)))
     return result

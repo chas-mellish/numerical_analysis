@@ -28,7 +28,7 @@ numerical_analysis/
     algorithms/                standard-library-only algorithms returning frozen result dataclasses
     expr/                      safe expression compiler for learner functions (ast whitelist)
     engines/                   Python engine, trace parser and FortranRunner
-    registry/                  catalog loader, integrity checks, generated Markdown (README index, errata tables)
+    registry/                  catalog loader, integrity checks, generated Markdown (README index and run commands, errata tables)
     tools/                     developer tools (book_machine: chopped-arithmetic emulation)
     web/                       FastAPI app factory (create_app), templates, static files
     errors.py                  typed errors with stable codes
