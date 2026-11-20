@@ -338,6 +338,222 @@ Expected results from the catalog's `[[expected]]` entries. *Book* is the value 
 | `lagrange_interpolation` | `xin` | `5.0` | `5.0` | AT X = 5.000 (F10.3; the OCR text shows 5.0000, which F10.3 cannot print). |
 <!-- RUN_COMMANDS_END -->
 
+## Using the web interface
+
+Start the server with `make serve` (or the Docker image, see [Getting started](#getting-started))
+and open <http://127.0.0.1:8000>. Every program has the same layout: a run form and the results
+side by side, tabs with the original and modern sources, and practice questions. Everything on a
+page is generated from the program's catalog entry. How the pages are built, and the test ids of
+every element, are in [`docs/architecture.md`](docs/architecture.md) ("Web UI and JSON API",
+"Results fragment", "Program page testids").
+
+### 1. Choose a program
+
+The home page, **Programs**, groups the programs by chapter: "Chapter 1: Solution of Nonlinear
+Equations", "Chapter 3: Numerical Integration" and "Chapter 4: Numerical Differentiation".
+Programs whose place in the book is not confirmed come last under **Book reference
+unconfirmed**; today that is only Lagrangian interpolation, whose card carries an "unconfirmed"
+badge (see [Missing scans](#missing-scans-and-programs-not-yet-migrated)). Each card shows the
+book reference, the method, a "Scan available" or "No scan" badge and the engines that can run it
+(for example "Engines: python, fortran, compare").
+
+Click a program's title to open its page at `/programs/<id>` (for example
+<http://127.0.0.1:8000/programs/ch01_p01>). The **All programs** link above the title, or the
+"Gerald · *Applied Numerical Analysis*" banner, leads back. The footer links the **JSON API**
+and its interactive **API docs** (see [Web routes and JSON API](#web-routes-and-json-api)).
+
+### 2. Fill in the run form
+
+The **Run** panel opens with the book's data card already filled in, so **Run** reproduces the
+book's printed result straight away.
+
+* **Data card.** One field per value on the card, in card order, labelled as in the listing
+  (`X1`, `X2`, `TOL`, ...) with its type (`real` or `int`). Below each field is a short
+  explanation and its allowed range, for example "Left end of the starting interval. F(X1) and
+  F(X2) must have opposite signs. (min -1000.0, max 1000.0)". Numbers may be typed the way the
+  data card spells them: `0.`, `.5`, `1.E-5`, `1.D-5` (the pre-filled values are shown in Python
+  notation, so the book's `1.E-5` appears as `1e-05`).
+* **Book data card.** Click this line at the end of the fieldset to show the card exactly as
+  printed in the book (for bisection `0. 1. 1.E-5`), with the catalog's note on it.
+* **Lists.** A list of reals with a fixed length, such as Bairstow's seven coefficients
+  "A (X\*\*6 ... X\*\*0)" ("list of reals, 7 entries"), has one field per entry and no buttons.
+  A list that can grow, such as Lagrange's "Data pairs X(I), Y(I)" ("list of (x, y) points"),
+  has a **Remove** button on each row and an **Add point** button below the rows (**Add entry**
+  for a list of reals). Lagrange's `N` follows the number of rows by itself ("Updated
+  automatically when you add or remove a row of Data pairs X(I), Y(I).").
+* **Function F(X).** Programs that take a function (bisection, Simpson, Romberg and central
+  differences) have a **Function** list. Option 1 is the book's function (for bisection "1: Book:
+  exp(-x) - sin(pi x / 2)"); the other numbered options are extra functions from the catalog
+  ("2: x^3 - x - 1", "3: cos(x) - x"). The line "Preset F(x) = ..." under the list shows the
+  formula being used. The last option, "Custom expression (Python engine only)", is described in
+  the next step. Bairstow and Lagrange work on data only and have no function.
+* **Reset to book data card.** This button, next to **Run**, puts back every field, the
+  function and the engine as they were when the page opened, and clears the results panel.
+
+Click **Run** ("Running..." shows while it works). If a value is rejected, the results panel
+shows **INPUT** "Please correct the highlighted values." with one line per field, for example
+"X1: 'abc' is not a number (examples: 0.5, 1.E-5)" and "TOL: 5.0 is above the maximum 1.0", and
+the offending fields are outlined in red until the next successful run or reset.
+
+### 3. Try your own function
+
+Type a formula in the **Custom expression** field (placeholder "for example x\*\*3 - 2\*x - 5").
+Typing there selects "Custom expression (Python engine only)" in the **Function** list by
+itself. The accepted syntax, listed under the field:
+
+* the variable `x`, numbers (data-card spellings too: `2.`, `.5`, `1.E-5`), the operators
+  `+ - * / **` and parentheses;
+* the constants `e` and `pi`;
+* the functions `abs`, `acos`, `asin`, `atan`, `atan2(y, x)`, `ceil`, `cos`, `cosh`, `exp`,
+  `floor`, `log`, `log10`, `sin`, `sinh`, `sqrt`, `tan`, `tanh`;
+* the FORTRAN names of the book's listings: `EXPF`, `SINF`, `COSF`, `ATANF`, `TANHF`, `LOGF`,
+  `SQRTF`, `ABSF`, `ALOG`, `ALOG10` and the double-precision `D...` names (`DSIN`, `DEXP`,
+  `DSQRT`, ...), plus `ln`, `arcsin`, `arccos` and `arctan`.
+
+Names are case-insensitive, so the book's own `EXPF(-X) - SINF(3.1415926*X/2.)` is accepted as
+written. As in Fortran, an integer exponent (`x**3`) is computed by repeated multiplication,
+which matches the Fortran presets bit for bit; a real exponent (`x**3.`) uses `pow`.
+
+**A custom function runs on the Python engine only.** The compiled Fortran drivers evaluate the
+catalog's preset functions (`--preset N`), so as soon as the custom expression is selected the
+Fortran and compare choices are disabled and the note "A custom expression runs on the Python
+engine only: the Fortran drivers evaluate the catalog presets (--preset N), so Fortran and
+compare are disabled." appears. Choose a numbered function again to re-enable them.
+
+An expression that cannot be compiled is rejected before anything runs. The results panel shows
+**EXPRESSION**, the message with its column, and the expression with a caret under the problem:
+
+```
+EXPRESSION syntax error: invalid syntax (at column 3)
+Problem at column 3:
+x**
+  ^
+```
+
+`sin(x` gives "syntax error: '(' was never closed (at column 4)", `foo(x)` gives "unknown
+function 'foo' (at column 1)" and `x + y` gives "unknown name 'y'; use the variable x, the
+constants pi and e, or a supported function (at column 5)". A formula that compiles but fails
+while the program runs, such as `log(x - 2)` on bisection's interval [0, 1], is reported like a
+program error (step 5): "EXPRESSION log(-2.0) is outside the function's domain (at x = 0.0)".
+
+### 4. Pick an engine
+
+The **Engine** choices are:
+
+* **Python**: the Python port (the default);
+* **Fortran (compiled book driver)**: the modern Fortran driver, run as a separate program
+  (needs `make build-fortran`; see [Troubleshooting](#troubleshooting-the-web-interface));
+* **Compare Python and Fortran**: both, with their traces compared row by row.
+
+Compare mode shows a summary first: the verdict **The engines agree bit for bit** or **The
+engines differ**, then "Iterations: python 15, fortran 15", "Outcome: python OK, fortran OK",
+"Largest cell difference: abs ..., rel ... (N differing cells, first in row R)", "Final value
+difference: ..." and a **Per column** table of the largest differences per column. Below it are
+the Python charts and the two traces, headed **Python** and **Fortran**, each with its summary,
+iteration table and book-format output. They sit side by side when the window is wide enough
+and stack otherwise. Every cell where the engines differ is highlighted (orange background), and
+hovering over it shows both the value and the difference ("abs diff 9.267e-09, rel diff
+9.214e-08").
+
+Why the engines can differ: Python computes in double precision (real64), and the standard
+Fortran build (`build/bin`) uses the same precision and the same formulas, so with it compare
+normally reports "The engines agree bit for bit". The book's own machine worked in about eight
+significant digits; to see that effect, build the
+[single-precision drivers](#single-precision-build) (`make build-fortran-single`) and start the
+server with `GERALD_NA_FORTRAN_BIN_DIR=build/single/bin make serve`. Compare then reports "The
+engines differ", for bisection with 15 differing F(X) cells (largest difference abs 6.778e-08),
+while the iteration count and the root agree. Each program's study page has a "Precision"
+section explaining which digits are expected to change.
+
+### 5. Read the results
+
+A successful run fills the **Results** panel with:
+
+* **the summary**: **Result** (the final value), **Converged** (yes or no), **Iterations** and
+  **Engine** (with the run time, for example "python (0.2 ms)");
+* **the charts** (Plotly), chosen per program: for bisection "Bracket shrinkage per iteration"
+  and "|F(X)| per iteration (log scale)", for Romberg the table coloured by its distance from the
+  result, for Bairstow R and S per iteration and the roots on the complex plane, for Lagrange the
+  interpolating polynomial through the data points. Hover over a point to read its values; drag
+  over an area to zoom in. The toolbar at the top right of each chart has **Zoom**, **Pan**,
+  **Zoom in**, **Zoom out**, **Autoscale**, **Reset axes** and **Download plot as a PNG**;
+* **the iteration table**, captioned for example "Iterations (15 rows, python engine)", with
+  the columns of the book's printout (bisection: I, X1, X2, X, F(X)). Values are rounded for
+  display; hover over a cell to see the full value;
+* **Result details** (open by default): every other field of the result, for example the input
+  values used, Romberg's triangular `table`, Bairstow's `factors` (one group per factor with its
+  coefficients) or Lagrange's `xs` and `ys`;
+* **Book-format output (python)** (or `fortran`): the lines the original program printed, in
+  its line-printer format, for example `AT X =   .5000000 F(X) =   -.100576`.
+
+When the program stops on one of its own error paths, the panel shows a red box with the code
+and the program's message instead of the summary, plus the rows computed before the stop:
+
+* Bisection with `X1` = 0.5 (and `X2` = 1, the book function): **BRACKET** "FUNCTION VALUES
+  WITH INITIAL X VALUES ARE NOT OF OPPOSITE SIGNS. CHANGE INPUTS." and "python engine.", with
+  "No iteration rows." below.
+* Bairstow with `LIM` = 4: **NON_CONVERGENT** "DOES NOT CONVERGE AFTER 4 ITERATIONS" and
+  "python engine; the 4 iteration rows computed before the error are shown below."; the partial
+  table and the book text, ending in `DOES NOT CONVERGE AFTER    4 ITERATIONS`, follow.
+
+These are results, not failures of the tool: the study page of each program lists the outcomes
+it handles ("Other outcomes the program handles").
+
+### 6. Read the sources
+
+Below the form, five tabs show where the program comes from (switch with a click or the left
+and right arrow keys):
+
+| Tab | Shows | Links |
+|---|---|---|
+| **Original scan** | the scanned book listing, inline | "Open the scan (PDF) in a new tab" (or "Download the scan" when the browser cannot show PDFs) |
+| **Legacy OCR text** | the OCR transcription in `legacy_code/`, as is (with the slips listed in the errata) | "raw file"; a page kept only as a scan is shown as "A scanned page (PDF); no OCR text of it exists. Open the PDF." |
+| **Modern Fortran** | the **Module** (`fortran/src/...`) and the **Driver** (`fortran/app/...`) | "raw file" for each |
+| **Python** | the Python function (its callable is named above the code) | "raw file" |
+| **Study page** | the study notes: the method, the data card, other outcomes, errata, precision and the practice questions | "Markdown source" |
+
+Every "raw file" link opens the file as plain text from `/files/<id>/<kind>`, the only files
+the server hands out. For Lagrangian interpolation the **Original scan** tab says "No scan
+available for this program" and explains that the page has not been scanned and its place in
+the book is unconfirmed.
+
+### 7. Answer the practice questions
+
+At the bottom of the page, **Practice questions** lists the program's questions. Type your answer
+in **Your answer** (**Your answer (yes or no)** for questions about convergence) and click
+**Check**. The answer is not looked up: the engines are run with the inputs the question states
+(independently of what is in the run form), and your answer is compared with their result
+within the question's tolerance (shown in the feedback when it is not zero). The feedback reads, for example:
+
+* **Correct** · "Your answer matches the computed 15.";
+* **Incorrect** · "The engine computes 0.443359375 (within 5e-06).";
+
+followed by what each engine computed ("Python engine: 15", and "Fortran engine: 15" when the
+driver is built) and an explanation. An answer that cannot be read is answered with a message
+and nothing is run, for example "'abc' is not a number (examples: 0.5, 1.E-5)" or "answer yes or
+no (true/false)". When no engine can compute the answer, the verdict is **Not checked** with "the
+answer could not be computed (...)".
+
+### Troubleshooting the web interface
+
+Settings are listed in [Configuration](#configuration); every one can be set as a `GERALD_NA_*`
+environment variable for a single run.
+
+* **"Unavailable: Fortran driver ... is not built in <dir> (run `make build-fortran`)"** next to
+  the Fortran and compare choices (and "Engines: python" on the home page card) means the
+  server found no compiled drivers, as described in [What you need](#what-you-need). Run
+  `make build-fortran` and reload the page (no restart needed), or, if the drivers are elsewhere
+  (for example the single-precision build), restart with
+  `GERALD_NA_FORTRAN_BIN_DIR=<dir> make serve`. A run started with an unavailable engine is
+  refused with **ENGINE_UNAVAILABLE** "fortran engine unavailable: ...". The Python engine,
+  the practice questions and every tab keep working.
+* **Port 8000 is taken**: `GERALD_NA_PORT=9000 make serve` (or
+  `uv --directory python run gerald-na serve --port 9000`), then open <http://127.0.0.1:9000>.
+* **A Fortran run times out**: each driver run is stopped after `run_timeout_s` (5 seconds by
+  default) and reported as **FORTRAN_RUN** "Fortran driver ch01_p01_bisection did not finish
+  within 5 s and was stopped". On a slow machine raise it, for example
+  `GERALD_NA_RUN_TIMEOUT_S=20 make serve`.
+
 ## Repository layout
 
 ```
@@ -507,14 +723,10 @@ machines.
 uv run python -m gerald_na.tools.book_machine [--bits N] [--digits N]
 ```
 
-## Web UI and JSON API
+## Web routes and JSON API
 
-`make serve` starts the web tool. The home page lists the programs by chapter (unconfirmed
-references last). Each program page has a form generated from the catalog and pre-filled with the
-book's data card, an engine selector (Python, Fortran, compare), the iteration table, a Plotly
-chart, the book-format text, "Result details", tabs for the original scan, the legacy OCR text,
-the modern Fortran, the Python source and the study page, and practice questions whose answers
-are checked by running the engines. Every interactive element has a `data-testid` for Playwright.
+How to use the pages is in [Using the web interface](#using-the-web-interface); this section lists
+the routes behind them and the JSON API (every interactive element has a `data-testid` for Playwright).
 
 | Route | Response |
 |---|---|
