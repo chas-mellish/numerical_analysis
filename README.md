@@ -773,6 +773,7 @@ the routes behind them and the JSON API (every interactive element has a `data-t
 | `GET /healthz` | liveness and engine availability |
 | `GET /` | home page |
 | `GET /programs/{id}` | program page; `POST /programs/{id}/run` returns the results fragment (HTMX) |
+| `GET /programs/{id}/form` | the run form pre-filled with the book data card (fragment behind "Reset to book data card") |
 | `POST /programs/{id}/practice/{question_id}` | practice-answer feedback fragment |
 | `GET /api/programs` | JSON list of programs (inputs, presets, engines available, scan available, ...) |
 | `GET /api/programs/{id}` | the full catalog entry with `/files/...` URLs |
