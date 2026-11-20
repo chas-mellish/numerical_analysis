@@ -39,10 +39,10 @@ Choose one of two paths:
 
   **Without gfortran the Python engine, the CLI and the web UI still work.** The Fortran engine
   then shows as unavailable: `/healthz` reports `"fortran":false`, and on a program page the
-  "Fortran (compiled book driver)" and "Compare Python and Fortran" choices are disabled with a
-  note such as
-  ``Unavailable: Fortran driver ch01_p01_bisection is not built in <dir> (run `make build-fortran`)``. `gerald-na run --engine fortran` prints the same message as an error
-  (exit status 2).
+  "Fortran (compiled book driver)" and "Compare Python and Fortran" choices carry a note such as
+  ``Unavailable: Fortran driver ch01_p01_bisection is not built in <dir> (run `make build-fortran`)``;
+  a run on either of them is refused with that message. `gerald-na run --engine fortran` prints the
+  same message as an error (exit status 2).
 
 ### Quick start (local)
 
