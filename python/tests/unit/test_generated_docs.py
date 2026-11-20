@@ -78,9 +78,17 @@ def _section(text: str, heading: str) -> str:
 # ------------------------------------------------------------------ up to date
 
 
-def test_readme_program_index_is_up_to_date(registry: Registry) -> None:
+def _readme_block(repo_root: Path, start: str, end: str) -> str:
+    readme = (repo_root / "README.md").read_text(encoding="utf-8")
+    return readme.split(f"{start}\n")[1].split(end)[0]
+
+
+def test_readme_generated_blocks_are_up_to_date(registry: Registry) -> None:
     readme = next(item for item in generated_files(registry) if item.relative == "README.md")
-    assert not readme.stale, "README.md program index is out of date: run `make readme-index`"
+    assert not readme.stale, (
+        "README.md generated blocks (program index, run commands) are out of date: "
+        "run `make readme-index`"
+    )
 
 
 def test_study_page_errata_tables_are_up_to_date(registry: Registry) -> None:
@@ -89,8 +97,7 @@ def test_study_page_errata_tables_are_up_to_date(registry: Registry) -> None:
 
 
 def test_readme_index_lists_every_program(registry: Registry, repo_root: Path) -> None:
-    readme = (repo_root / "README.md").read_text(encoding="utf-8")
-    block = readme.split(INDEX_START)[1].split(INDEX_END)[0]
+    block = _readme_block(repo_root, INDEX_START, INDEX_END)
     for entry in registry.programs:
         assert f"| `{entry.id}` | {book_reference(entry)} |" in block
         assert f"[`{entry.files.fortran_executable}`]({entry.files.fortran_app})" in block
@@ -102,19 +109,8 @@ def test_readme_index_lists_every_program(registry: Registry, repo_root: Path) -
     assert "Without a scan: `lagrange_interpolation`" in block
 
 
-def _run_commands_block(repo_root: Path) -> str:
-    readme = (repo_root / "README.md").read_text(encoding="utf-8")
-    return readme.split(f"{RUN_COMMANDS_START}\n")[1].split(RUN_COMMANDS_END)[0]
-
-
-def test_readme_run_commands_block_is_up_to_date(registry: Registry, repo_root: Path) -> None:
-    assert _run_commands_block(repo_root) == render_run_commands(registry), (
-        "README.md run commands are out of date: run `make readme-index`"
-    )
-
-
 def test_readme_run_commands_list_every_program(registry: Registry, repo_root: Path) -> None:
-    block = _run_commands_block(repo_root)
+    block = _readme_block(repo_root, RUN_COMMANDS_START, RUN_COMMANDS_END)
     fortran, python = re.findall(r"^```sh\n(.*?)^```$", block, re.MULTILINE | re.DOTALL)
     for entry in registry.programs:
         comment = f"# {entry.id}: {entry.title}\n"
