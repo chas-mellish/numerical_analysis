@@ -73,10 +73,10 @@ Choose one of two paths:
 
 ### Quick start (local)
 
-1. **Get the code** and change into it:
+1. **Get the code** and change into it (substitute a fork or mirror URL if you use one):
 
    ```sh
-   git clone <repository-url> numerical_analysis
+   git clone https://github.com/chas-mellish/numerical_analysis.git numerical_analysis
    cd numerical_analysis
    ```
 
