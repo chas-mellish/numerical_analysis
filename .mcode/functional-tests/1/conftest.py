@@ -47,15 +47,19 @@ def run_driver(name, card, *flags, timeout=20, bin_dir=BIN_DIR):
     )
 
 
-def run_cli(*args, timeout=120):
+def run_cli(*args, timeout=120, env_extra=None, cwd=None):
     """Run the ``gerald-na`` console script from the repository's uv project."""
+    env = None
+    if env_extra is not None:
+        env = {**os.environ, **env_extra}
     return subprocess.run(
         ["uv", "--directory", str(REPO_ROOT / "python"), "run", "--frozen", "gerald-na", *args],
         capture_output=True,
         text=True,
         timeout=timeout,
         check=False,
-        cwd=str(REPO_ROOT),
+        cwd=str(cwd or REPO_ROOT),
+        env=env,
     )
 
 

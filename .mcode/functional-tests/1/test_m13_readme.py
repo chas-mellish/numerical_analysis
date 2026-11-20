@@ -43,16 +43,6 @@ def readme_text():
     return README.read_text(encoding="utf-8")
 
 
-def run_cli_env(*args, env_extra=None, cwd=None, timeout=120):
-    env = dict(os.environ)
-    env.update(env_extra or {})
-    return subprocess.run(
-        ["uv", "--directory", str(REPO_ROOT / "python"), "run", "--frozen", "gerald-na", *args],
-        capture_output=True, text=True, timeout=timeout, check=False,
-        cwd=str(cwd or REPO_ROOT), env=env,
-    )
-
-
 def sh(cmd, cwd=REPO_ROOT, timeout=60):
     return subprocess.run(["bash", "-c", cmd], capture_output=True, text=True,
                           cwd=str(cwd), timeout=timeout, check=False)
@@ -71,7 +61,7 @@ def repo_copy(tmp_path):
 
 
 def index_in(root, *args):
-    return run_cli_env("catalog", "index", *args, env_extra={"GERALD_NA_REPO_ROOT": str(root)})
+    return run_cli("catalog", "index", *args, env_extra={"GERALD_NA_REPO_ROOT": str(root)})
 
 
 # =========================================================================== catalog index CLI
@@ -257,8 +247,7 @@ class TestRunCommandsBlock:
     def test_m13_run_commands_python_executes(self, pid, needle, evidence):
         run = block(readme_text(), RUN_START, RUN_END)
         assert f"uv run gerald-na run {pid}\n" in run
-        r = subprocess.run(["uv", "run", "--frozen", "gerald-na", "run", pid], capture_output=True, text=True,
-                           cwd=str(REPO_ROOT / "python"), timeout=120, check=False)
+        r = run_cli("run", pid)
         evidence(exit_code=r.returncode, stdout=r.stdout, stderr=r.stderr, command=f"(cd python) uv run gerald-na run {pid}")
         assert r.returncode == 0, r.stderr
         assert needle in r.stdout
@@ -318,7 +307,7 @@ class TestGettingStarted:
     def test_m13_no_fortran_cli_engine_message(self, tmp_path, evidence):
         empty = tmp_path / "ftrun_empty_bin"
         empty.mkdir()
-        r = run_cli_env("run", "ch01_p01", "--engine", "fortran", env_extra={"GERALD_NA_FORTRAN_BIN_DIR": str(empty)})
+        r = run_cli("run", "ch01_p01", "--engine", "fortran", env_extra={"GERALD_NA_FORTRAN_BIN_DIR": str(empty)})
         evidence(exit_code=r.returncode, stdout=r.stdout, stderr=r.stderr,
                  command="GERALD_NA_FORTRAN_BIN_DIR=<empty> gerald-na run ch01_p01 --engine fortran")
         assert r.returncode == 2
@@ -429,8 +418,7 @@ class TestRunningPrograms:
         assert "VALUE IS  1.6181944," in rom.stdout
 
     def test_m13_doc_python_compare_simpson(self, evidence):
-        r = subprocess.run(["uv", "run", "--frozen", "gerald-na", "run", "ch03_p01", "--engine", "compare"],
-                           capture_output=True, text=True, cwd=str(REPO_ROOT / "python"), timeout=120, check=False)
+        r = run_cli("run", "ch03_p01", "--engine", "compare")
         evidence(exit_code=r.returncode, stdout=r.stdout, stderr=r.stderr, command="uv run gerald-na run ch03_p01 --engine compare")
         assert r.returncode == 0
         lines = r.stdout.splitlines()
@@ -443,24 +431,18 @@ class TestRunningPrograms:
         assert re.match(r"\s+K: max abs 0\.000e\+00  max rel 0\.000e\+00  first differing row -", lines[6])
 
     def test_m13_doc_python_expr(self, evidence):
-        r = subprocess.run(["uv", "run", "--frozen", "gerald-na", "run", "ch01_p01", "--expr", "x**3 - 2",
-                            "--input", "x1=1", "--input", "x2=2"],
-                           capture_output=True, text=True, cwd=str(REPO_ROOT / "python"), timeout=120, check=False)
+        r = run_cli("run", "ch01_p01", "--expr", "x**3 - 2", "--input", "x1=1", "--input", "x2=2")
         evidence(exit_code=r.returncode, stdout=r.stdout, stderr=r.stderr, command="uv run gerald-na run ch01_p01 --expr 'x**3 - 2' --input x1=1 --input x2=2")
         assert r.returncode == 0
         assert r.stdout.splitlines()[-1] == "THE VALUE, X =  1.2599220 IS A ROOT.  18 ITERATIONS WERE REQUIRED."
 
     def test_m13_doc_python_expr_fortran_refused(self, evidence):
-        r = subprocess.run(["uv", "run", "--frozen", "gerald-na", "run", "ch01_p01", "--expr", "x**3 - 2",
-                            "--engine", "fortran"],
-                           capture_output=True, text=True, cwd=str(REPO_ROOT / "python"), timeout=120, check=False)
+        r = run_cli("run", "ch01_p01", "--expr", "x**3 - 2", "--engine", "fortran")
         evidence(exit_code=r.returncode, stdout=r.stdout, stderr=r.stderr, command="gerald-na run ch01_p01 --expr ... --engine fortran")
         assert r.returncode == 2
 
     def test_m13_doc_python_expr_fortran_names(self, evidence):
-        r = subprocess.run(["uv", "run", "--frozen", "gerald-na", "run", "ch01_p01", "--expr",
-                            "EXPF(-X) - SINF(3.1415926*X/2.)"],
-                           capture_output=True, text=True, cwd=str(REPO_ROOT / "python"), timeout=120, check=False)
+        r = run_cli("run", "ch01_p01", "--expr", "EXPF(-X) - SINF(3.1415926*X/2.)")
         evidence(exit_code=r.returncode, stdout=r.stdout, stderr=r.stderr, command="gerald-na run ch01_p01 --expr 'EXPF(-X) - SINF(3.1415926*X/2.)'")
         assert r.returncode == 0
         assert "15 ITERATIONS WERE REQUIRED" in r.stdout
