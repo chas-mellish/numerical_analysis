@@ -3,6 +3,7 @@
 import asyncio
 import re
 from collections.abc import Iterator
+from html.parser import HTMLParser
 
 import pytest
 from fastapi.testclient import TestClient
@@ -136,6 +137,39 @@ def test_fortran_engine_disabled_when_driver_missing(no_binaries_client: TestCli
     assert "disabled" not in input_tag(html, "engine-python")
     assert has_testid(html, "engine-note-fortran")
     assert "make build-fortran" in html
+
+
+def input_attrs(html: str, name: str) -> dict[str, str | None]:
+    """The attributes of the ``<input>`` with ``data-testid=name``, as a browser parses them."""
+    found: list[dict[str, str | None]] = []
+
+    class Parser(HTMLParser):
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            parsed = dict(attrs)
+            if tag == "input" and parsed.get("data-testid") == name:
+                found.append(parsed)
+
+    Parser().feed(input_tag(html, name))
+    assert len(found) == 1, name
+    return found[0]
+
+
+def test_unavailable_engine_radios_have_separate_attributes(
+    no_binaries_client: TestClient,
+) -> None:
+    html = no_binaries_client.get(f"/programs/{BISECTION}").text
+    for name in ("engine-fortran", "engine-compare"):
+        attrs = input_attrs(html, name)
+        assert "disabled" in attrs, name
+        assert attrs.get("data-unavailable") == "true", name
+        assert attrs.get("data-needs-preset") == "true", name
+        assert "checked" not in attrs, name
+        # No attribute names glued together by trim_blocks (e.g. 'disableddata-unavailable').
+        assert all(key.count("data-") <= 1 for key in attrs), attrs
+    python = input_attrs(html, "engine-python")
+    assert "checked" in python
+    assert "disabled" not in python
+    assert "data-unavailable" not in python
 
 
 def test_fortran_engine_disabled_in_settings(python_only_client: TestClient) -> None:
