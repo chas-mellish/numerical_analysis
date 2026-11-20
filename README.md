@@ -16,6 +16,33 @@ Each program is described once in a shared catalog (`catalog/*.toml`); the UI, t
 engines and the program index below read it. The original OCR transcriptions in `legacy_code/` and
 the scans in `docs/*.pdf` are kept unchanged as the reference.
 
+## Contents
+
+* [Getting started](#getting-started): [What you need](#what-you-need),
+  [Quick start (local)](#quick-start-local)
+* [Programs](#programs): [Missing scans and programs not yet migrated](#missing-scans-and-programs-not-yet-migrated)
+* [Running the programs](#running-the-programs): [Compiled Fortran drivers](#compiled-fortran-drivers),
+  [Driver options](#driver-options), [Single-precision build](#single-precision-build),
+  [Python port](#python-port),
+  [Commands and expected results for every program](#commands-and-expected-results-for-every-program)
+* [Using the web interface](#using-the-web-interface): [Choose a program](#1-choose-a-program),
+  [Fill in the run form](#2-fill-in-the-run-form), [Try your own function](#3-try-your-own-function),
+  [Pick an engine](#4-pick-an-engine), [Read the results](#5-read-the-results),
+  [Read the sources](#6-read-the-sources), [Answer the practice questions](#7-answer-the-practice-questions),
+  [Troubleshooting](#troubleshooting-the-web-interface)
+
+Reference:
+
+* [Repository layout](#repository-layout)
+* [Setup](#setup): [Prerequisites](#prerequisites), [Local setup](#local-setup), [Docker](#docker),
+  [Devcontainer](#devcontainer)
+* [Lifecycle targets](#lifecycle-targets): [Tests](#tests)
+* [Configuration](#configuration)
+* [Command line](#command-line)
+* [Web routes and JSON API](#web-routes-and-json-api)
+* [Adding a program](#adding-a-program)
+* [Further reading](#further-reading)
+
 ## Getting started
 
 ### What you need
@@ -30,8 +57,8 @@ Choose one of two paths:
   docker run --rm -p 8000:8000 gerald-na
   ```
 
-  Then open <http://127.0.0.1:8000>. The image has a `HEALTHCHECK` on `/healthz`; see
-  [Docker](#docker) for what is inside it.
+  Then open <http://127.0.0.1:8000>. [Docker](#docker) describes what is inside the image (pinned
+  toolchain, health check) and how to run the test gates in it.
 * **Local**. You need GNU make, [uv](https://docs.astral.sh/uv/) (it installs Python 3.15 itself)
   and, for the Fortran engine, gfortran 16 and fpm 0.13. LLVM flang is optional (a second
   compiler check). Exact versions are in [Prerequisites](#prerequisites); a ready-made editor
@@ -88,8 +115,10 @@ single-precision build and the remaining make targets.
 
 ## Programs
 
-The index is generated from the catalog by `make readme-index` (`gerald-na catalog index --write`);
-do not edit the text between the markers by hand. `make test` fails while it is out of date.
+The index is generated from the catalog by `make readme-index` (`gerald-na catalog index --write`),
+like the [commands and expected results](#commands-and-expected-results-for-every-program) block
+further down; do not edit the text between the markers by hand. `make test` fails while either
+block is out of date.
 Every program runs on the Python engine, the Fortran engine and in compare mode, and has a web page
 at `/programs/<id>`.
 
@@ -261,7 +290,8 @@ same outcome: True  same iterations: True
 
 `--expr` replaces the program's function with your own. It runs on the Python engine only;
 `--engine fortran` with `--expr` is refused with exit status 2. Old FORTRAN names such as `EXPF` and
-`SINF` are accepted, in either case.
+`SINF` are accepted, in either case; the full syntax is listed in
+[Try your own function](#3-try-your-own-function).
 
 ```sh
 $ uv run gerald-na run ch01_p01 --expr 'x**3 - 2' --input x1=1 --input x2=2
@@ -269,8 +299,8 @@ $ uv run gerald-na run ch01_p01 --expr 'x**3 - 2' --input x1=1 --input x2=2
 THE VALUE, X =  1.2599220 IS A ROOT.  18 ITERATIONS WERE REQUIRED.
 ```
 
-`--input name=value`, `--preset N`, `--verbose`, `--trace-json` and the other options are listed in
-[Command line](#command-line).
+`--input name=value`, `--preset N`, `--verbose`, `--trace-json` and the other options, with the exit
+statuses, are listed in [Command line](#command-line).
 
 ### Commands and expected results for every program
 
@@ -344,8 +374,9 @@ Start the server with `make serve` (or the Docker image, see [Getting started](#
 and open <http://127.0.0.1:8000>. Every program has the same layout: a run form and the results
 side by side, tabs with the original and modern sources, and practice questions. Everything on a
 page is generated from the program's catalog entry. How the pages are built, and the test ids of
-every element, are in [`docs/architecture.md`](docs/architecture.md) ("Web UI and JSON API",
-"Results fragment", "Program page testids").
+every element, are in `docs/architecture.md`: [Web UI and JSON API](docs/architecture.md#web-ui-and-json-api),
+[Results fragment](docs/architecture.md#results-fragment) and
+[Program page testids](docs/architecture.md#program-page-testids).
 
 ### 1. Choose a program
 
@@ -513,9 +544,9 @@ and right arrow keys):
 | **Study page** | the study notes: the method, the data card, other outcomes, errata, precision and the practice questions | "Markdown source" |
 
 Every "raw file" link opens the file as plain text from `/files/<id>/<kind>`, the only files
-the server hands out. For Lagrangian interpolation the **Original scan** tab says "No scan
-available for this program" and explains that the page has not been scanned and its place in
-the book is unconfirmed.
+the server hands out (see [Web routes and JSON API](#web-routes-and-json-api)). For Lagrangian
+interpolation the **Original scan** tab says "No scan available for this program" and explains
+that the page has not been scanned and its place in the book is unconfirmed.
 
 ### 7. Answer the practice questions
 
@@ -574,6 +605,9 @@ Makefile                  lifecycle targets
 Dockerfile, .devcontainer/  reference environment
 ```
 
+Each directory is described in more detail in
+[`docs/architecture.md`, "Repository layout"](docs/architecture.md#repository-layout).
+
 ## Setup
 
 ### Prerequisites
@@ -588,10 +622,13 @@ Dockerfile, .devcontainer/  reference environment
 | Chromium for Playwright | installed by `make e2e` | browser tests only |
 
 Without a Fortran compiler the Python side still installs and its unit, golden, web and CLI tests
-run: tests that need the drivers are marked `fortran` and skip with the reason "Fortran binaries
-not built: run `make build-fortran`", and the web UI offers only the Python engine.
+run: tests that need the drivers are marked `fortran` and are skipped (see [Tests](#tests)). What
+the web UI and the CLI show without the drivers is described in [What you need](#what-you-need).
 
 ### Local setup
+
+The make targets of a local setup, in order. [Quick start (local)](#quick-start-local) walks
+through them step by step, with what each step prints and how to check it.
 
 ```sh
 make sync            # uv sync: python/.venv with the package and dev tools
@@ -602,10 +639,11 @@ make serve           # http://127.0.0.1:8000  (health check: GET /healthz)
 
 ### Docker
 
+Build and serve the image as shown in [What you need](#what-you-need). To run the gates in the
+image:
+
 ```sh
-docker build -t gerald-na .
-docker run --rm -p 8000:8000 gerald-na                       # serves on http://127.0.0.1:8000
-docker run --rm -it gerald-na make test test-fortran lint    # run the gates in the image
+docker run --rm -it gerald-na make test test-fortran lint
 ```
 
 The image (Ubuntu 24.04, gfortran 16 from the ubuntu-toolchain-r/test PPA, LLVM flang 22,
@@ -636,7 +674,7 @@ Fortran, Ruff, Python, mypy and TOML extensions. Then use the make targets as ab
 | `make format` | `ruff format` and `ruff check --fix` |
 | `make e2e` | installs Playwright Chromium if needed and runs `pytest -m e2e` (one browser test per program) |
 | `make serve` | `uv run gerald-na serve` |
-| `make readme-index` | regenerates the program index above and the errata table of every study page from the catalog |
+| `make readme-index` | `gerald-na catalog index --write`: regenerates, from the catalog, the two generated blocks of this README (the [program index](#programs) and the [commands and expected results for every program](#commands-and-expected-results-for-every-program)) and the errata table of every study page |
 | `make clean` | removes `build/`, `fortran/build/` and tool caches (keeps `python/.venv`) |
 
 Variables: `FC=flang` switches the compiler for every Fortran target, `FFLAGS` / `FFLAGS_TEST`
@@ -673,7 +711,8 @@ the prefix `GERALD_NA_`:
 | `repo_root` | auto-detected | repository root (nearest ancestor of the package holding `config/settings.toml` or `catalog/`) |
 
 Examples: `GERALD_NA_PORT=9000 make serve`, or
-`GERALD_NA_FORTRAN_BIN_DIR=build/single/bin make test` to run against the single-precision build.
+`GERALD_NA_FORTRAN_BIN_DIR=build/single/bin make test` to run against the single-precision build
+(see [Tests](#tests)).
 Lists are given as JSON (`GERALD_NA_ENGINES_ENABLED='["python"]'`). There are no secrets, no
 database and no external services.
 
@@ -694,7 +733,6 @@ uv run gerald-na serve [--host 0.0.0.0] [--port 8000] [--reload]
 uv run gerald-na run ch03_p01                       # VALUE OF SINE INTEGRAL ... IS 1.5499312 WITH 100 PANELS
 uv run gerald-na run ch01_p01 --input tol=1.E-3     # override one data-card field
 uv run gerald-na run ch01_p01 --preset 2 --input x1=1 --input x2=2   # another catalog function
-uv run gerald-na run ch01_p01 --expr 'x**3 - 2' --input x1=1 --input x2=2   # custom F(x), Python only
 uv run gerald-na run lagrange_interpolation --input n=3 --input points=1,1,2,4,4,16 --input xin=2.5
 uv run gerald-na run ch01_p02 --engine fortran --verbose          # the compiled driver, with extras
 uv run gerald-na run ch03_p02 --engine compare                    # both engines, traces diffed
@@ -704,18 +742,20 @@ uv run gerald-na run ch01_p01 --trace-json                        # full outcome
 
 Lists are comma-separated (`--input a=0,1,-17.8,99.41,-261.218,352.611,-134.106`), point lists
 are flat `x1,y1,x2,y2,...`, and reals accept the data-card spellings (`1.E-5`, `1.D-5`, `.5`).
+`--expr '<formula>'` replaces the program's function with your own (Python engine only); an
+example with its output is in [Python port](#python-port).
 
 **Inspect the catalog:**
 
 ```sh
 uv run gerald-na catalog list            # id, book reference, scan, title
 uv run gerald-na catalog check           # every entry valid and every referenced file present (exit 1 otherwise)
-uv run gerald-na catalog index           # print the README program index
-uv run gerald-na catalog index --check   # exit 1 if README.md or a study page's errata table is stale
-uv run gerald-na catalog index --write   # regenerate them (make readme-index)
+uv run gerald-na catalog index           # print both README blocks: the program index, a blank line, then the run commands
+uv run gerald-na catalog index --check   # exit 1 if a README block (program index, run commands) or a study page's errata table is stale
+uv run gerald-na catalog index --write   # regenerate the stale blocks (make readme-index)
 ```
 
-**Re-run the book-machine evidence** (`docs/architecture.md`, "The book's computer"): the
+**Re-run the book-machine evidence** ([`docs/architecture.md`, "The book's computer"](docs/architecture.md#the-books-computer-not-identified)): the
 chopped-arithmetic emulation of the book's data cards on 27-bit binary and 8/9-digit decimal
 machines.
 
@@ -749,12 +789,18 @@ Errors are `{"error": {"code", "message", ...}}` with 404 (unknown program), 422
 `INPUT` with per-field messages, `EXPRESSION`, `CUSTOM_FUNCTION_ENGINE`) or 503
 (`ENGINE_UNAVAILABLE`). A completed run is 200 even when the program stops on one of its own error
 paths (`ok: false`, with `error.code` such as `BRACKET` or `NON_CONVERGENT`). The full contract is
-in `docs/architecture.md`, "Web UI and JSON API".
+in [`docs/architecture.md`, "Web UI and JSON API"](docs/architecture.md#web-ui-and-json-api), in
+particular [Routes](docs/architecture.md#routes),
+[`POST /api/programs/{id}/run`](docs/architecture.md#post-apiprogramsidrun) and
+[Security](docs/architecture.md#security).
 
 ## Adding a program
 
 A program counts as migrated when all of these exist (the catalog schema and the trace protocol
-are the extension contract; details in `docs/architecture.md`):
+are the extension contract; details in `docs/architecture.md`:
+[Catalog schema](docs/architecture.md#catalog-schema),
+[DD2: Trace protocol](docs/architecture.md#dd2-trace-protocol---trace) and
+[Adding a program to the engines](docs/architecture.md#adding-a-program-to-the-engines)):
 
 1. **Catalog entry** `catalog/chNN_pNN_<name>.toml` (id `chNN_pNN` for a confirmed book reference;
    otherwise a non-book id with `book_ref_confirmed = false`): book reference, summary, precision
