@@ -40,6 +40,7 @@ __all__ = [
     "format_expected_value",
     "generated_files",
     "printf_argument",
+    "printf_command",
     "render_errata_table",
     "render_program_index",
     "render_run_commands",
@@ -147,6 +148,18 @@ def printf_argument(card: str) -> str:
     return "'" + "".join(f"{line}\\n" for line in escaped) + "'"
 
 
+def printf_command(card: str, executable: str) -> str:
+    r"""The ``printf <arg> | build/bin/<executable>`` line for the README run block.
+
+    A ``--`` end-of-options marker is inserted when ``card``'s first non-blank line starts with
+    ``-``; without it, ``sh``'s ``printf`` would read the card as an option (e.g. ``-1.0``).
+    Current catalog cards all start with a digit, so no README output changes today.
+    """
+    arg = printf_argument(card)
+    end_of_options = "-- " if arg.startswith("'-") else ""
+    return f"printf {end_of_options}{arg} | build/bin/{executable}"
+
+
 def format_expected_value(value: BookValue) -> str:
     """A scalar expected value as a code span: shortest round-trip ``repr`` for reals.
 
@@ -184,10 +197,7 @@ def render_run_commands(registry: Registry) -> str:
     ]
     for entry in registry.programs:
         lines.append(f"# {entry.id}: {entry.title}")
-        lines.append(
-            f"printf {printf_argument(entry.data_card.text)} "
-            f"| build/bin/{entry.files.fortran_executable}"
-        )
+        lines.append(printf_command(entry.data_card.text, entry.files.fortran_executable))
     lines += ["```", "", "Python port, from `python/` (the same data card is the default input):"]
     lines += ["", "```sh"]
     for entry in registry.programs:

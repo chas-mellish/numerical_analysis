@@ -30,6 +30,7 @@ from gerald_na.registry.generated import (
     format_expected_value,
     generated_files,
     printf_argument,
+    printf_command,
     render_errata_table,
     render_program_index,
     render_run_commands,
@@ -163,15 +164,33 @@ def test_printf_argument_multi_card_programs(registry: Registry) -> None:
     )
 
 
+def test_printf_command_no_dash_prefix_for_digit_cards() -> None:
+    assert printf_command("0. 1. 1.E-5", "x") == "printf '0. 1. 1.E-5\\n' | build/bin/x"
+
+
+def test_printf_command_adds_end_of_options_for_leading_dash_card() -> None:
+    assert printf_command("-1.0   2.0\n", "x") == "printf -- '-1.0   2.0\\n' | build/bin/x"
+
+
 @pytest.mark.skipif(shutil.which("sh") is None, reason="needs a POSIX shell")
 @pytest.mark.parametrize(
     "card",
-    ["0.        1.        1.E-5", "50% it's \\n back\\slash\n  second card  \n", "%d %s ''"],
-    ids=["plain", "special", "format-like"],
+    [
+        "0.        1.        1.E-5",
+        "50% it's \\n back\\slash\n  second card  \n",
+        "%d %s ''",
+        "-1.0   2.0",
+    ],
+    ids=["plain", "special", "format-like", "leading-dash"],
 )
 def test_printf_argument_round_trips_through_sh(card: str) -> None:
+    # Prefix printf_argument with `-- ` for leading-dash cards, so sh's
+    # printf does not treat the data card as options (what printf_command
+    # does for the generator).
+    arg = printf_argument(card)
+    end_of_options = "-- " if arg.startswith("'-") else ""
     out = subprocess.run(  # noqa: S603 - fixed argv, no user input
-        ["sh", "-c", f"printf {printf_argument(card)}"],  # noqa: S607 - POSIX sh on PATH
+        ["sh", "-c", f"printf {end_of_options}{arg}"],  # noqa: S607 - POSIX sh on PATH
         capture_output=True,
         text=True,
         check=True,
