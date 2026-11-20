@@ -224,7 +224,7 @@ Each study page explains them in its "Precision" section (for example
 | Flag | Effect | Accepted by |
 |---|---|---|
 | `--trace` | machine-readable records only, no book text: `STEP` records, then `RESULT` or `ERROR` (Bairstow adds `FACTOR` and Romberg `TABLE` records); exit status 2 on `ERROR` | all six drivers |
-| `--verbose` | extras after the book text, under the heading `VERBOSE OUTPUT (NOT PART OF THE BOOK TEXT)`: the working precision, the data card at full precision and program details (e.g. Bairstow's true factors and roots, Lagrange's terms) | all six drivers |
+| `--verbose` | extras after the book text, under the heading `VERBOSE OUTPUT (NOT PART OF THE BOOK TEXT)`: the working precision, the data card at full precision (all drivers except Bairstow, which echoes no data card) and program details (e.g. Bairstow's true factors, roots and iterations per factor, Lagrange's terms) | all six drivers |
 | `--preset N` | the function to use, from the book's function presets (default 1 = the book's function); the list is in each driver's `--help` | bisection, Simpson, Romberg, central differences (not Bairstow or Lagrange, which take data rather than a function) |
 | `--help` | usage text, including the preset list | all six drivers |
 
