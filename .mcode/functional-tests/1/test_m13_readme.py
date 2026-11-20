@@ -14,12 +14,11 @@ import shutil
 import socket
 import subprocess
 import time
-from pathlib import Path
 
 import pytest
 import requests
 
-from conftest import BASE_URL, BIN_DIR, REPO_ROOT, SINGLE_BIN_DIR, run_cli, run_driver, trace_records
+from conftest import BASE_URL, REPO_ROOT, SINGLE_BIN_DIR, run_cli, run_driver, trace_records
 
 README = REPO_ROOT / "README.md"
 RUN_START = "<!-- RUN_COMMANDS_START -->"
@@ -613,7 +612,7 @@ def _free_port():
 
 
 @pytest.fixture
-def alt_server(request):
+def alt_server():
     """Start ``gerald-na serve`` with extra env vars on a free port; yields the base URL."""
     procs = []
 
