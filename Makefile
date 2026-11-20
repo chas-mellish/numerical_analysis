@@ -13,7 +13,7 @@
 #   make format                ruff format + ruff check --fix
 #   make e2e                   Playwright browser tests (installs Chromium if needed)
 #   make serve                 run the web learning tool (gerald-na serve)
-#   make readme-index          regenerate the README program index + study-page errata tables
+#   make readme-index          regenerate the README program index + run commands + study-page errata tables
 #   make clean                 remove build output and tool caches (keeps python/.venv)
 #
 # Compiler selection: FC=gfortran (default) or FC=flang. FFLAGS / FFLAGS_TEST override the flag
@@ -110,7 +110,7 @@ e2e:
 serve:
 	$(UV_PY) run gerald-na serve
 
-# Markdown generated from catalog/*.toml (README.md program index, content/*.md errata tables).
+# Markdown generated from catalog/*.toml (README.md program index and run commands, content/*.md errata tables).
 # `make test` fails while these blocks are stale (python/tests/unit/test_generated_docs.py).
 readme-index:
 	$(UV_PY) run gerald-na catalog index --write

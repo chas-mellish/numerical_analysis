@@ -59,6 +59,72 @@ at `/programs/<id>`.
 
 New programs follow the checklist in [Adding a program](#adding-a-program).
 
+## Running the programs
+
+The block below is generated from the catalog by `make readme-index`; do not edit it by hand.
+
+<!-- RUN_COMMANDS_START -->
+Compiled Fortran drivers, from the repository root (each command feeds the catalog's data card on standard input; use `build/single/bin/` for the single-precision build):
+
+```sh
+# ch01_p01: Interval halving (bisection)
+printf '0.        1.        1.E-5\n' | build/bin/ch01_p01_bisection
+# ch01_p02: Bairstow quadratic factors
+printf '0.        1.        -17.8     99.41     -261.218  352.611   -134.106\n0.        0.        1.E-5     20  5\n' | build/bin/ch01_p02_bairstow
+# ch03_p01: Simpson's 1/3 rule, Si(B)
+printf '5.0           100\n' | build/bin/ch03_p01_simpson
+# ch03_p02: Romberg integration, Si(B)
+printf '15.0           2.E-7\n' | build/bin/ch03_p02_romberg
+# ch04_p01: Derivatives by central differences
+printf '0.0       0.1\n' | build/bin/ch04_p01_central_difference
+# lagrange_interpolation: Lagrangian interpolation
+printf '05\n2.3756  1.6\n3.2682  1.9\n4.4571  2.2\n6.0502  2.5\n8.1919  2.8\n5.0\n' | build/bin/lagrange_interpolation
+```
+
+Python port, from `python/` (the same data card is the default input):
+
+```sh
+# ch01_p01: Interval halving (bisection)
+uv run gerald-na run ch01_p01
+# ch01_p02: Bairstow quadratic factors
+uv run gerald-na run ch01_p02
+# ch03_p01: Simpson's 1/3 rule, Si(B)
+uv run gerald-na run ch03_p01
+# ch03_p02: Romberg integration, Si(B)
+uv run gerald-na run ch03_p02
+# ch04_p01: Derivatives by central differences
+uv run gerald-na run ch04_p01
+# lagrange_interpolation: Lagrangian interpolation
+uv run gerald-na run lagrange_interpolation
+```
+
+Expected results from the catalog's `[[expected]]` entries. *Book* is the value transcribed from the scan, *real64* the value of the default (double-precision) build; the drivers print it truncated to the book's FORMAT, so their significant digits are the leading digits of the value shown. Rows and tables are described in the last column.
+
+| Program id | Quantity | Book | real64 | What the book prints |
+|---|---|---|---|---|
+| `ch01_p01` | `root` | `0.4435729` | `0.443572998046875` | THE VALUE, X = .4435729 IS A ROOT. |
+| `ch01_p01` | `iterations` | `15` | `15` | 15 ITERATIONS WERE REQUIRED. (identical in real32 and real64) |
+| `ch01_p01` | `steps` | - | - | The 15 printed AT X = ... F(X) = ... rows (book digits are truncated, not rounded). |
+| `ch01_p02` | `factors` | - | - | X\*\*2 + 4.19999 X + -2.09999 / X\*\*2 + 3.29999 X + -6.20000 / 1.00000X + -10.30000 (chopped digits); exact 4.2, -2.1, 3.3, -6.2, 1.0, -10.3. |
+| `ch01_p02` | `factor_count` | `3` | `3` | Three factors are printed: two quadratics and the final linear factor (N = 5 is odd). |
+| `ch03_p01` | `value` | `1.5499307` | `1.5499312397703537` | VALUE OF SINE INTEGRAL FROM X = 0 TO X = 5.00 IS 1.5499307 WITH 100 PANELS |
+| `ch03_p01` | `panels` | `100` | `100` | WITH 100 PANELS |
+| `ch03_p02` | `value` | `1.6181936` | `1.6181944440409433` | VALUE IS 1.6181936, (real64: Si(15) = 1.6181944) |
+| `ch03_p02` | `subintervals` | `80` | `80` | 80 SUBINTERVALS WERE REQUIRED TO MEET TOLERANCE OF 2.0000000E-07 (identical in real32 and real64) |
+| `ch03_p02` | `iterations` | `3` | `3` | 3 halvings: the 4 printed lines of the table (identical in real32 and real64) |
+| `ch03_p02` | `table` | - | - | The printed triangular table; line L is TRAP(1..L, L). |
+| `ch04_p01` | `steps` | - | - | The 10 printed rows H, DX, DDX (book digits are those of its 8-digit machine; see precision\_notes). |
+| `ch04_p01` | `first_dx` | `0.010016675` | `0.010016675001984412` | Row 1: DX = 1.0016675E-02 for H = .1 (H\*SINH(H) = 0.0100166750020; well conditioned). |
+| `ch04_p01` | `first_ddx` | `2.0100083` | `2.010008336111607` | Row 1: DDX = 2.0100083E+00 for H = .1 (2\*COSH(H) = 2.0100083361). |
+| `ch04_p01` | `value` | `0.0` | `1.0000000031710762e-20` | DX of the last row (H = 1.E-10): the book prints 0.0000000E-99 (its F(X+H) and F(X-H) are equal); real64 keeps H\*SINH(H) = 1.0E-20. |
+| `ch04_p01` | `last_ddx` | `2.0` | `2.0` | DDX of the last row: 2.0000000E+00. |
+| `ch04_p01` | `iterations` | `10` | `10` | DO 10 I = 1,10: ten printed rows. |
+| `lagrange_interpolation` | `value` | `2.3119` | `2.3119012901784366` | THE FUNCTION HAS VALUE OF 2.3119 (F10.4; one unit of the last printed digit). |
+| `lagrange_interpolation` | `n` | `5` | `5` | INTERPOLATION AMONG 5 VALUES (I3). |
+| `lagrange_interpolation` | `iterations` | `5` | `5` | Terms summed by the DO 20 loop (one per data pair). |
+| `lagrange_interpolation` | `xin` | `5.0` | `5.0` | AT X = 5.000 (F10.3; the OCR text shows 5.0000, which F10.3 cannot print). |
+<!-- RUN_COMMANDS_END -->
+
 ## Repository layout
 
 ```

@@ -99,13 +99,15 @@ def build_parser() -> argparse.ArgumentParser:
     catalog_check.set_defaults(handler=_catalog_check)
     catalog_index = catalog_commands.add_parser(
         "index",
-        help="print the README program index; --check/--write the generated Markdown blocks",
+        help="print the README generated blocks; --check/--write the generated Markdown blocks",
         description=(
             "Render the Markdown generated from the catalog: the program index between the "
-            "PROGRAM_INDEX markers of README.md and the errata table between the ERRATA_TABLE "
-            "markers of every study page. Without options the index is printed. --check exits "
-            "with status 1 when a block is out of date; --write rewrites the stale blocks "
-            "(make readme-index)."
+            "PROGRAM_INDEX markers and the per-program run commands and expected results between "
+            "the RUN_COMMANDS markers of README.md, and the errata table between the "
+            "ERRATA_TABLE markers of every study page. Without options both README blocks are "
+            "printed (the index, a blank line, then the run commands). --check exits with "
+            "status 1 when a block is out of date or its markers are missing; --write rewrites "
+            "the stale blocks (make readme-index)."
         ),
     )
     mode = catalog_index.add_mutually_exclusive_group()
@@ -159,12 +161,18 @@ def _catalog_check(_args: argparse.Namespace) -> int:
 
 
 def _catalog_index(args: argparse.Namespace) -> int:
-    from gerald_na.registry.generated import generated_files, render_program_index
+    from gerald_na.registry.generated import (
+        generated_files,
+        render_program_index,
+        render_run_commands,
+    )
 
     try:
         registry = Registry.load(get_settings().repo_root)
         if not (args.check or args.write):
             sys.stdout.write(render_program_index(registry))
+            sys.stdout.write("\n")
+            sys.stdout.write(render_run_commands(registry))
             return 0
         files = generated_files(registry)
     except CatalogError as exc:
@@ -175,7 +183,7 @@ def _catalog_index(args: argparse.Namespace) -> int:
         if stale:
             print(
                 "out of date (run `make readme-index`): "
-                + ", ".join(item.relative for item in stale),
+                + ", ".join(f"{item.relative} ({', '.join(item.stale_blocks)})" for item in stale),
                 file=sys.stderr,
             )
             return 1
