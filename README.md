@@ -194,19 +194,26 @@ $ build/bin/ch01_p02_bairstow < sample_input.txt
     1.00000X +  -10.30000
 ```
 
-What to look for with the book's data cards (default real64 build):
+What to look for with the book's data cards (default real64 build). The exact book and real64
+values for every program are in
+[Commands and expected results for every program](#commands-and-expected-results-for-every-program);
+the notes below only say where and why the output differs from the scan.
 
-* **ch01_p01, bisection**: root `.4435729` after 15 iterations, as in the book. The last F(X) row
-  prints `.000000`, while the scan prints `.000001`.
-* **ch01_p02, Bairstow**: the factors x² + 4.2x − 2.1, x² + 3.3x − 6.2 and x − 10.3, printed with
-  chopped digits. The real64 build prints `3.30000` for the second factor where the book prints
-  `3.29999`. The other digits match the book.
-* **ch03_p01, Simpson**: Si(5) = `1.5499312` with 100 panels; the book prints `1.5499307`.
-* **ch03_p02, Romberg**: Si(15) = `1.6181944` with 80 subintervals; the book prints `1.6181936`.
-* **ch04_p01, central differences**: the first row (`1.0016675E-02`, `2.0100083E+00`) matches the
-  book. For small H the real64 DX keeps its digits (`1.0000000E-20` in the last row), while the
-  book prints `0.0000000E-99`.
-* **lagrange_interpolation**: `2.3119` at X = 5.000, as in the book.
+* **ch01_p01, bisection**: root and iteration count as in the book. The last F(X) row prints
+  `.000000` where the scan prints `.000001`.
+* **ch01_p02, Bairstow**: the exact factors are x² − 4.2x + 2.1, x² − 3.3x + 6.2 and x − 10.3,
+  but the driver prints them under the book's FORMAT 17 label `X**2 + R X + S` so the printed
+  signs of the quadratic terms look flipped (the original quirk `factor-sign-label`; see the
+  catalog erratum and [content/ch01_p02.md](content/ch01_p02.md), or use `--verbose`). The real64
+  build prints `3.30000` where the book prints `3.29999` for the second factor; the other
+  printed digits match.
+* **ch03_p01, Simpson**: real64 differs from the book's printed Si(5) in the 6th decimal (see the
+  table).
+* **ch03_p02, Romberg**: real64 differs from the book's printed Si(15) in the 6th decimal (see the
+  table).
+* **ch04_p01, central differences**: the first row matches the book. For small H the real64 DX
+  keeps its digits where the book prints `0.0000000E-99` (last row, see the table).
+* **lagrange_interpolation**: the interpolated value matches the book (see the table).
 
 These differences come from the arithmetic of the book's machine, not from errors in the programs.
 Each study page explains them in its "Precision" section (for example
