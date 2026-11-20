@@ -1,0 +1,383 @@
+# Chapter 1, Program 2: quadratic factors of polynomials to sixth degree, Bairstow method.
+# Schema: docs/architecture.md, "Catalog schema". Transcribed from docs/chapter_01_program_02_listing.pdf
+# (listing on book page 25, data cards and output on page 26); every value below was read from the scan,
+# not from the OCR text.
+
+id = "ch01_p02"
+title = "Bairstow quadratic factors"
+method = "Bairstow"
+summary = """
+Bairstow's method splits a real polynomial into real quadratic factors without complex arithmetic.
+Synthetic division by a trial quadratic gives a remainder that depends on its two coefficients; a
+second synthetic division gives the partial derivatives, and a Newton step (DELR, DELS from a 2x2
+system with denominator C(7)*C(7) - C(8)*C(6)) corrects them until |DELR| + |DELS| <= TEST. The
+quotient then becomes the new polynomial and the next factor starts from the last R and S, until a
+final quadratic or linear factor remains. The book program reads the coefficients of X**6 down to
+X**0 on one card and R1 S1 TEST LIM N on a second. For x**5 - 17.8x**4 + 99.41x**3 - 261.218x**2 +
+352.611x - 134.106 it prints the factors X**2 + 4.19999 X + -2.09999, X**2 + 3.29999 X + -6.20000 and
+1.00000X + -10.30000: the program labels each factor X**2 + R X + S, but divides by X**2 - R X - S,
+so the exact factors are x**2 - 4.2x + 2.1, x**2 - 3.3x + 6.2 and x - 10.3.
+"""
+book_ref_confirmed = true
+precision_notes = """
+Both precisions need 8 corrections for the first factor and 5 for the second (13 in total, starting
+from R = S = 0 with TEST = 1.E-5). Convergence is quadratic: the last correction of the first factor
+is about 1e-9 in real64, so the converged R and S differ from the exact 4.2, -2.1, 3.3, -6.2 and
+-10.3 by less than 2e-9 in real64 and by about 1e-6 in real32.
+
+The book's line printer chopped the last digit, so the exact value 4.2 computed as 4.1999998 prints as
+4.19999. The modern drivers print the factor lines with the RZ (round toward zero) edit mode and no
+leading zero. real64 then reproduces 4.19999 -2.09999 / 3.30000 -6.20000 / 1.00000 -10.30000 (book:
+3.29999, because the book's R ended just below 3.3); real32 prints 4.20000 -2.10000 / 3.29999 -6.19999 /
+1.00000 -10.29999. The last digit depends on which side of the exact value the arithmetic lands, so the
+golden tests compare numbers within 2e-5, not text. The echoed polynomial is printed rounded to nearest:
+the book shows 99.41000, -17.80000 and -261.21800, exact as on a decimal machine, while binary 99.41 is
+99.409999... and would chop to 99.40999. This is one of the hints that chapter 1 ran on a decimal
+machine (IBM 1620 class); the chapter 3 sums fit 27-bit chopped binary better, and the book's computer
+is not identified (docs/architecture.md, "The book's computer").
+"""
+book_output = """
+THE ORIGINAL POLYNOMIAL-
+
+    POWER OF X     COEFFICIENT
+
+          5           1.00000
+          4         -17.80000
+          3          99.41000
+          2        -261.21800
+          1         352.61100
+          0        -134.10600
+
+
+THE QUADRATIC FACTORS ARE-
+
+X**2 +    4.19999 X +   -2.09999
+X**2 +    3.29999 X +   -6.20000
+   1.00000X +  -10.30000
+"""
+
+[book_ref]
+chapter = 1
+program = 2
+page = 25
+title = "Solution of Nonlinear Equations"
+
+# ------------------------------------------------------------------ inputs (data-card order)
+# READ 1, (A(I), I = 3,9)          / 1 FORMAT (7F10.0)
+# READ 2, R1, S1, TEST, LIM, N     / 2 FORMAT (2F10.0, E10.0, 2I3)
+
+[[inputs]]
+name = "a"
+type = "real_list"
+label = "A (X**6 ... X**0)"
+default = [0.0, 1.0, -17.8, 99.41, -261.218, 352.611, -134.106]
+min = -1.0e6
+max = 1.0e6
+length = 7
+help = "Card 1: the seven coefficients from X**6 down to X**0. Powers above N must be zero."
+card = 1
+
+[[inputs]]
+name = "r1"
+type = "real"
+label = "R1"
+default = 0.0
+min = -100.0
+max = 100.0
+help = "Starting R of the trial factor (printed X**2 + R X + S, divided out as X**2 - R X - S)."
+card = 2
+
+[[inputs]]
+name = "s1"
+type = "real"
+label = "S1"
+default = 0.0
+min = -100.0
+max = 100.0
+help = "Starting S of the trial factor. Later factors start from the previous factor's R and S."
+card = 2
+
+[[inputs]]
+name = "test"
+type = "real"
+label = "TEST"
+default = 1.0e-5
+min = 1.0e-12
+max = 1.0
+help = "A factor is accepted when |DELR| + |DELS| <= TEST."
+card = 2
+
+[[inputs]]
+name = "lim"
+type = "int"
+label = "LIM"
+default = 20
+min = 1
+max = 999
+help = "Maximum number of corrections for each factor (KOUNT restarts at 1 for every factor)."
+card = 2
+
+[[inputs]]
+name = "n"
+type = "int"
+label = "N"
+default = 5
+min = 0
+max = 99
+help = "Degree of the polynomial; the program accepts 2 to 6 (other values give a DEGREE error)."
+card = 2
+
+[data_card]
+# Card 1: 7F10.0 (columns 1-70); card 2: 2F10.0, E10.0, 2I3. The deck ends with a ZZZZ card.
+text = """
+0.        1.        -17.8     99.41     -261.218  352.611   -134.106
+0.        0.        1.E-5     20  5
+"""
+values = { a = [0.0, 1.0, -17.8, 99.41, -261.218, 352.611, -134.106], r1 = 0.0, s1 = 0.0, test = 1.0e-5, lim = 20, n = 5 }
+note = "Drivers read both cards list-directed, so the printed cards work unchanged. The OCR text's -126.218 is a slip: the scan reads -261.218."
+
+# ------------------------------------------------------------------ function (DD3)
+
+[function]
+takes_function = false
+
+# ------------------------------------------------------------------ trace protocol (DD2)
+
+[trace]
+step_columns = [
+    { key = "factor", label = "Factor", format = "I2" },
+    { key = "k", label = "KOUNT", format = "I3" },
+    { key = "r", label = "R", format = "F12.7" },
+    { key = "s", label = "S", format = "F12.7" },
+    { key = "delr", label = "DELR", format = "E12.4" },
+    { key = "dels", label = "DELS", format = "E12.4" },
+]
+records = [
+    { type = "FACTOR", fields = ["kind", "r", "s", "a2", "a1", "a0"], description = "One printed factor, written after the last STEP of its search: kind=quadratic with r, s (FORMAT 17, X**2 + R X + S as printed; the divisor is X**2 - R X - S); the last factor is kind=final_quadratic with a2, a1, a0 = B(5), B(6), B(7) (FORMAT 22, N even) or kind=linear with a1, a0 = B(6), B(7) (FORMAT 23, N odd)." },
+]
+result_extras = [
+    { key = "nudges", type = "int", description = "Zero-denominator nudges (R = R + 1, S = S + 1) taken during the run." },
+]
+
+# ------------------------------------------------------------------ golden expectations (DD4)
+
+[[expected]]
+name = "factors"
+kind = "table"
+field = "factor_table"
+description = "X**2 + 4.19999 X + -2.09999 / X**2 + 3.29999 X + -6.20000 / 1.00000X + -10.30000 (chopped digits); exact 4.2, -2.1, 3.3, -6.2, 1.0, -10.3."
+book_value = [[4.19999, -2.09999], [3.29999, -6.20000], [1.00000, -10.30000]]
+tol_real64 = 2.0e-5
+tol_real32 = 2.0e-5
+real64_value = [[4.2, -2.1], [3.3, -6.2], [1.0, -10.3]]
+tol_real64_value = 1.0e-8
+
+[[expected]]
+name = "factor_count"
+kind = "int"
+field = "value"
+description = "Three factors are printed: two quadratics and the final linear factor (N = 5 is odd)."
+book_value = 3
+
+# ------------------------------------------------------------------ files
+
+[files]
+legacy = [
+    "legacy_code/fortran/chapter_1/fortran_program_02.f90",
+    "legacy_code/fortran/chapter_2/bairstow.f90",
+]
+scan_pdf = "docs/chapter_01_program_02_listing.pdf"
+fortran_module = "fortran/src/bairstow_mod.f90"
+fortran_app = "fortran/app/ch01_p02_bairstow.f90"
+fortran_executable = "ch01_p02_bairstow"
+python_callable = "gerald_na.algorithms.bairstow:bairstow"
+study_page = "content/ch01_p02.md"
+
+[chart]
+kind = "factors"
+# Convergence of R and S per factor (one trace per factor from the STEP rows), the correction size
+# |DELR| + |DELS| on a log axis, the roots of the true factors X**2 - R X - S on the complex plane
+# (with the polynomial's own roots as a reference), and the polynomial with its real roots marked.
+# Option names: docs/architecture.md, "Chart kinds".
+options = { group_key = "factor", index_key = "k", r_key = "r", s_key = "s", delta_keys = ["delr", "dels"], log_delta = true, factors_field = "factors", quadratic_form = "x^2 - r x - s", poly_input = "a", show_polynomial = true }
+
+# ------------------------------------------------------------------ practice questions
+# Reference answers computed with the book algorithm in real64 (identical in real32 unless noted).
+
+[[practice]]
+id = "book-iterations"
+prompt = "Run the book's data cards. How many Bairstow corrections does the program make in total for the two quadratic factors?"
+answer_field = "iterations"
+answer = 13
+tolerance = 0.0
+explanation = "Starting from R = S = 0 the first factor needs 8 corrections; the second starts from that factor's R and S and needs 5 more."
+
+[[practice]]
+id = "book-factor-count"
+prompt = "How many factors does the program print for the book's fifth-degree polynomial?"
+answer_field = "value"
+answer = 3
+tolerance = 0.0
+explanation = "Two quadratic factors reduce the degree from 5 to 1, and label 18 prints the remaining linear factor 1.00000X + -10.30000."
+
+[[practice]]
+id = "lim-per-factor"
+prompt = "Lower LIM to 8. The run needs 13 corrections in total: does it still converge?"
+inputs = { lim = 8 }
+answer_field = "converged"
+answer = true
+explanation = "KOUNT restarts at 1 for every factor, so LIM bounds each factor's search (8 and 5 corrections), not the total. With LIM = 7 the first factor fails."
+
+[[practice]]
+id = "warm-start"
+prompt = "Start from the first factor itself: R1 = 4.2, S1 = -2.1. How many corrections are needed now?"
+inputs = { r1 = 4.2, s1 = -2.1 }
+answer_field = "iterations"
+answer = 6
+tolerance = 0.0
+explanation = "The first factor is accepted after a single correction; the second factor, started from 4.2 and -2.1, needs 5."
+
+[[practice]]
+id = "zero-denominator"
+prompt = "Factor x**4 - 16 (A = 0 0 1 0 0 0 -16, N = 4) from R1 = S1 = 0. How many times does the program nudge R and S because the denominator is exactly zero?"
+inputs = { a = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -16.0], n = 4 }
+answer_field = "nudges"
+answer = 1
+tolerance = 0.0
+explanation = "At R = S = 0 every C(J) equals A(J), so DENOM = C(7)**2 - C(8)*C(6) = 0 - 0 = 0. R and S become 1 and 1; the search then converges to x**2 - 4 (printed R = 0, S = 4) and the final factor x**2 + 4."
+
+# ------------------------------------------------------------------ errata
+# Mirrored in the ERRATA header of fortran/app/ch01_p02_bairstow.f90 and on content/ch01_p02.md.
+
+[[errata]]
+id = "dimension-c9"
+kind = "ocr_slip"
+original = "DIMENSION A(9), B(9), C(I)"
+corrected = "DIMENSION A(9), B(9), C(9)"
+note = "The text transcription read the 9 as the letter I; C is indexed up to C(9)."
+
+[[errata]]
+id = "data-card-coefficient"
+kind = "ocr_slip"
+original = "0. 1. -17.8 99.41 -126.218 352.611 -134.106"
+corrected = "0. 1. -17.8 99.41 -261.218 352.611 -134.106"
+note = "The scan's data card reads -261.218, matching the printed coefficient -261.21800 and the book text's -261.218x**2."
+
+[[errata]]
+id = "ocr-character-slips"
+kind = "ocr_slip"
+original = "QUTPUT; READ 1+ (A(I), I = 3.9); Sl; E10,0; BX; B(2) = O.; C(1) = O.; J=9 ~ N; DO 5 I = j, 9; C(7)*C(7) — C(8)*C(6); IF ( DENOM) = 9, 10, 9; R1 + l.; (~B(8); F1l0.5; DO 21 K = 3.9"
+corrected = "OUTPUT; READ 1, (A(I), I = 3,9); S1; E10.0; 8X; B(2) = 0.; C(1) = 0.; J = 9 - N; DO 5 I = J,9; C(7)*C(7) - C(8)*C(6); IF ( DENOM) 9, 10, 9; R1 + 1.; (-B(8); F10.5; DO 21 K = 3,9"
+note = "Character-level OCR confusions (O/0, l/1, S/5, B/8, comma/period, dashes, a stray '='), all read correctly from the scan."
+
+[[errata]]
+id = "format-24-hollerith"
+kind = "ocr_slip"
+original = "24 FORMAT (25H DOES NOT CONVERGE AFTER, l4, 11H ITERATIONS )"
+corrected = "24 FORMAT (25H DOES NOT CONVERGE AFTER , I4, 11H ITERATIONS    )"
+note = "The 25-character Hollerith ends with a blank before the comma (otherwise it would swallow the comma), and l4 is the edit descriptor I4. Printed: DOES NOT CONVERGE AFTER   20 ITERATIONS."
+
+[[errata]]
+id = "format-17-hollerith"
+kind = "ocr_slip"
+original = "17 FORMAT ( 8H X**2 + , F10.5, SH X , F10.5)"
+corrected = "17 FORMAT ( 8H X**2 + , F10.5, 5H X + , F10.5)"
+note = "SH is 5H, and the OCR lost the '+' of the 5-character Hollerith ' X + '."
+
+[[errata]]
+id = "job-cards-and-page-headings"
+kind = "ocr_slip"
+original = "ZZJ0B 5 csC 001 / ZZFORXS *L 1ST PRINTER / C 1-9 PROGRAMMING OF METHODS ... / C Program 2"
+corrected = "ZZJOB 5  CSC 001  GERALD, C. F. / ZZFORX5 / *LIST PRINTER (job control, dropped)"
+note = "The job-control cards were garbled and the book's page heading was inserted as comment cards. The modern program has neither."
+
+[[errata]]
+id = "printed-output-transcription"
+kind = "ocr_slip"
+original = "X**2 4.19999 X + -2.09999 / 1.00000X + - 10.30000"
+corrected = "X**2 +    4.19999 X +   -2.09999 / 1.00000X +  -10.30000"
+note = "The OCR'd printout lost the '+' signs and blanks of FORMATs 17 and 23; the catalog book_output is the scan's text."
+
+[[errata]]
+id = "nudge-never-reloads-r-s"
+kind = "original_bug"
+original = "10 R1 = R1 + 1. / S1 = S1 + 1. / GO TO 11   (11 KOUNT = 1 -- R and S are not reloaded)"
+corrected = "R = R + 1., S = S + 1., KOUNT = 1, then recompute B and C"
+note = "R = R1 and S = S1 run once before label 11, so the original repeated the same zero denominator forever. The book's text states the intent ('the r and s values are arbitrarily incremented by one'); the working R and S are bumped."
+
+[[errata]]
+id = "factor-sign-label"
+kind = "original_quirk"
+original = "17 FORMAT ( 8H X**2 + , F10.5, 5H X + , F10.5) prints X**2 + R X + S"
+corrected = "kept as printed; the factor divided out is X**2 - R X - S (--verbose and the study page show it)"
+note = "B(J) = A(J) + R*B(J-1) + S*B(J-2) divides by X**2 - R X - S. The book's text confirms it: the exact factors are x**2 - 4.2x + 2.1, x**2 - 3.3x + 6.2 and x - 10.3."
+
+[[errata]]
+id = "exact-zero-denominator"
+kind = "rewrite_drift"
+original = "if (abs(denom) < epsilon(1.0_dp)) then  (legacy chapter_2/bairstow.f90)"
+corrected = "IF ( DENOM) 9, 10, 9 -- nudge only when DENOM is exactly zero"
+note = "The scan's arithmetic IF takes label 10 only for an exact zero; the faithful exact test is kept (a NaN DENOM is nonzero). Tested with x**4 - 16 and x**3 - 8 from R = S = 0, where DENOM is exactly zero."
+
+[[errata]]
+id = "convergence-test-equality"
+kind = "rewrite_drift"
+original = "if (abs(delr) + abs(dels) < test) exit newton"
+corrected = "IF ( ABSF(DELR) + ABSF(DELS) - TEST) 12, 12, 13 -- accept when <= TEST"
+note = "The zero branch of the arithmetic IF goes to label 12, so equality converges."
+
+[[errata]]
+id = "rewrite-input-order"
+kind = "rewrite_drift"
+original = "read n; read (a(i), i = 9-n, 9); read r1, s1, test, lim (interactive prompts, degree first)"
+corrected = "card 1: A(3) ... A(9) (X**6 first); card 2: R1 S1 TEST LIM N"
+note = "The drivers read the book's data cards again; the root-level sample_input.txt was rewritten into this order."
+
+[[errata]]
+id = "rewrite-output-layout"
+kind = "rewrite_drift"
+original = "' THE QUADRATIC FACTORS ARE:', '   X**2 + r X + s   (as printed by the original program)', true factor and roots inline"
+corrected = "FORMATs 1000, 3, 4, 6, 7, 17, 22, 23 and 24 of the scan; the true factors and roots behind --verbose"
+note = "Default output is the book's line-printer text again."
+
+[[errata]]
+id = "degree-two-constant-quotient"
+kind = "original_quirk"
+original = "N = 2: IF (N - 2) 18, 19, 20 with N = 0 -> 18 PRINT 23, B(6), B(7)"
+corrected = "kept: the second line is .00000X + A, A the leading coefficient"
+note = "For a quadratic the first factor is the polynomial divided by its leading coefficient, and label 18 prints the constant quotient as a 'linear' factor."
+
+[[errata]]
+id = "truncated-digits"
+kind = "original_quirk"
+original = "4.19999 -2.09999 / 3.29999 -6.20000 / 1.00000 -10.30000 (printed, chopped)"
+corrected = "real64: 4.19999 -2.09999 / 3.30000 -6.20000 / 1.00000 -10.30000; real32: 4.20000 -2.10000 / 3.29999 -6.19999 / 1.00000 -10.29999"
+note = "Factor lines use RZ and no leading zero, like the book's printer; the last digit depends on the arithmetic, so golden tests compare values within 2e-5. Echoed coefficients are rounded to nearest (binary 99.41 would chop to 99.40999)."
+
+[[errata]]
+id = "nudge-limit"
+kind = "modernization"
+original = "(no limit: label 10 can repeat indefinitely)"
+corrected = "more than LIM nudges during one factor -> 24 DOES NOT CONVERGE AFTER LIM ITERATIONS"
+note = "Guarantees termination when DENOM stays exactly zero after every nudge, for example an all-zero polynomial."
+
+[[errata]]
+id = "degree-check"
+kind = "modernization"
+original = "J = 9 - N with no check of N; nonzero coefficients above X**N are used but not printed"
+corrected = "N outside 2..6 or a nonzero coefficient above X**N -> DEGREE error (DegreeError)"
+note = "The book would index A(9-N) outside the array, or print one polynomial and factor another."
+
+[[errata]]
+id = "page-eject"
+kind = "modernization"
+original = "1000 FORMAT (1H1,29H DEMONSTRATION PROGRAM OUTPUT)"
+corrected = "the record is written with a blank carriage-control column"
+note = "stdout has no line printer; '1' (new page) is replaced by a blank, so the heading prints as ' DEMONSTRATION PROGRAM OUTPUT'. The scan shows the output from THE ORIGINAL POLYNOMIAL- on (the heading was on the new page)."
+
+[[errata]]
+id = "structured-control-flow"
+kind = "modernization"
+original = "arithmetic IFs, GO TO 11/16, CALL EXIT, READ with FORMATs 7F10.0 and 2F10.0, E10.0, 2I3"
+corrected = "IF blocks and named DO loops keeping every zero branch, list-directed reads, exit status"
+note = "Branch semantics are unchanged; the cards may be typed with any spacing. ABSF became ABS."

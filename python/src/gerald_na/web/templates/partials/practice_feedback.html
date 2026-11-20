@@ -1,0 +1,15 @@
+{% set q = check.question %}
+{% if not check.readable %}
+<p class="alert error" role="alert" data-testid="practice-invalid">{{ check.message }}</p>
+{% else %}
+<div class="feedback {{ 'correct' if check.correct else ('incorrect' if check.correct is not none else 'unknown') }}"
+     data-testid="practice-verdict" data-correct="{{ 'true' if check.correct else ('false' if check.correct is not none else 'unknown') }}">
+  <p class="verdict"><strong>{% if check.correct %}Correct{% elif check.correct is none %}Not checked{% else %}Incorrect{% endif %}</strong> &middot; {{ check.message }}</p>
+  <ul class="computed">
+    {% for item in check.computed %}
+    <li data-testid="practice-computed-{{ item.engine }}">{{ item.engine | capitalize }} engine: {% if item.error %}<span class="error-text">{{ item.error }}</span>{% else %}<code>{{ item.text }}</code>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  <p class="explanation" data-testid="practice-explanation">{{ q.explanation }}</p>
+</div>
+{% endif %}

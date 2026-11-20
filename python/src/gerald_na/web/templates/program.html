@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% import "partials/outcome.html" as o %}
+{% block title %}{{ entry.title }} &middot; Gerald, Applied Numerical Analysis{% endblock %}
+{% block head %}<script src="/static/vendor/plotly-cartesian.min.js?v=3.7.0" defer></script>{% endblock %}
+{% macro source_block(file, testid, caption="") %}
+  <figure class="source">
+    <figcaption>{% if caption %}<strong>{{ caption }}</strong> {% endif %}{% if file.path %}<code>{{ file.path }}</code>{% endif %}
+      {% if file.url %}<a href="{{ file.url }}" target="_blank" rel="noopener" data-testid="download-{{ testid }}">raw file</a>{% endif %}</figcaption>
+    {% if file.is_pdf %}
+    <p class="empty" data-testid="{{ testid }}-pdf">A scanned page (PDF); no OCR text of it exists. <a href="{{ file.url }}" target="_blank" rel="noopener">Open the PDF</a>.</p>
+    {% elif file.text is not none %}
+    <pre class="code" data-testid="{{ testid }}"><code>{{ file.text }}</code></pre>
+    {% else %}
+    <p class="empty" data-testid="{{ testid }}-missing">Not available: {{ file.missing_reason }}</p>
+    {% endif %}
+  </figure>
+{% endmacro %}
+{% block content %}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/" data-testid="nav-home">All programs</a></nav>
+<header class="program-header">
+  <h1 data-testid="program-title">{{ entry.title }}</h1>
+  <p class="bookref" data-testid="book-ref">{{ book_ref_text(entry) }}
+    {% if not entry.book_ref_confirmed %}<span class="badge warn" data-testid="book-ref-unconfirmed" title="The chapter, program and page of this listing have not been confirmed against the book">Book reference unconfirmed</span>{% endif %}
+    <span class="badge" data-testid="program-id">{{ entry.id }}</span>
+  </p>
+  <p class="program-summary" data-testid="program-summary"><strong>{{ entry.method }}.</strong> {{ entry.summary | trim }}</p>
+</header>
+
+<div class="workbench">
+  <section class="panel form-panel" aria-labelledby="run-heading">
+    <h2 id="run-heading">Run</h2>
+    {% include "partials/run_form.html" %}
+  </section>
+  <section class="panel results-panel" aria-labelledby="results-heading">
+    <h2 id="results-heading">Results</h2>
+    <div id="results" data-testid="results" aria-live="polite">
+      {% if results %}
+        {% include "partials/results.html" %}
+      {% else %}
+        {% include "partials/results_placeholder.html" %}
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<section class="tabs" data-tabs aria-label="Sources and study material">
+  <div role="tablist" class="tablist" aria-label="Sources">
+    {% for key, label in tabs %}
+    <button type="button" role="tab" id="tab-{{ key }}" aria-controls="panel-{{ key }}"
+            aria-selected="{{ 'true' if loop.first else 'false' }}" tabindex="{{ 0 if loop.first else -1 }}"
+            data-testid="tab-{{ key }}">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  <div role="tabpanel" id="panel-scan" aria-labelledby="tab-scan" data-testid="panel-scan" tabindex="0">
+    {% if scan_available %}
+    <object data="{{ scan_url }}" type="application/pdf" class="pdf" data-testid="scan-viewer" aria-label="Scan of the book listing">
+      <p class="empty">This browser cannot show the PDF inline. <a href="{{ scan_url }}" data-testid="scan-download-fallback">Download the scan</a>.</p>
+    </object>
+    <p><a href="{{ scan_url }}" target="_blank" rel="noopener" data-testid="scan-download">Open the scan (PDF) in a new tab</a></p>
+    {% else %}
+    <div class="empty-state" data-testid="scan-missing">
+      <h3>No scan available for this program</h3>
+      <p>{% if entry.files.scan_pdf is none %}The book page for this listing has not been scanned{% if not entry.book_ref_confirmed %}, and its place in the book is unconfirmed{% endif %}.{% else %}The catalog names a scan, but the file is missing from this installation.{% endif %}
+        The legacy OCR text and the modern sources are in the other tabs.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div role="tabpanel" id="panel-legacy" aria-labelledby="tab-legacy" data-testid="panel-legacy" tabindex="0" hidden>
+    <p class="help">The OCR transcription kept in <code>legacy_code/</code>, shown as is: it contains the transcription slips listed in the errata. Pages kept only as scans are linked as PDFs.</p>
+    {% for file in legacy_files %}
+      {{ source_block(file, "legacy-source-" ~ loop.index0) }}
+    {% endfor %}
+  </div>
+
+  <div role="tabpanel" id="panel-fortran" aria-labelledby="tab-fortran" data-testid="panel-fortran" tabindex="0" hidden>
+    {% for caption, file in fortran_files %}
+      {{ source_block(file, "fortran-" ~ ("module" if loop.first else "app") ~ "-source", caption) }}
+    {% endfor %}
+  </div>
+
+  <div role="tabpanel" id="panel-python" aria-labelledby="tab-python" data-testid="panel-python" tabindex="0" hidden>
+    <p class="help">The callable <code>{{ entry.files.python_callable }}</code>.</p>
+    {{ source_block(python_file, "python-source") }}
+  </div>
+
+  <div role="tabpanel" id="panel-study" aria-labelledby="tab-study" data-testid="panel-study" tabindex="0" hidden>
+    {% if study_html is not none %}
+    <article class="study prose" data-testid="study-content">{{ study_html }}</article>
+    {% if study_file.url %}<p><a href="{{ study_file.url }}" target="_blank" rel="noopener" data-testid="download-study">Markdown source</a></p>{% endif %}
+    {% else %}
+    <p class="empty" data-testid="study-missing">Study page not available: {{ study_file.missing_reason }}</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="practice" data-testid="practice-section" aria-labelledby="practice-heading">
+  <h2 id="practice-heading">Practice questions</h2>
+  {% if entry.practice %}
+  <p class="help">Answers are checked by running the engines with the question's inputs; Fortran runs too when its driver is built.</p>
+  <ol class="practice-list">
+  {% for q in entry.practice %}
+    <li class="practice-q" data-testid="practice-{{ q.id }}">
+      <p class="prompt" data-testid="practice-prompt-{{ q.id }}">{{ q.prompt }}</p>
+      <form class="practice-form" method="post" action="/programs/{{ entry.id }}/practice/{{ q.id }}"
+            hx-post="/programs/{{ entry.id }}/practice/{{ q.id }}" hx-target="#practice-feedback-{{ q.id }}" hx-swap="innerHTML">
+        <label for="practice-answer-{{ q.id }}">Your answer{% if q.answer_field == "converged" %} (yes or no){% endif %}</label>
+        <input id="practice-answer-{{ q.id }}" name="answer" type="text" autocomplete="off" maxlength="64" data-testid="practice-answer-{{ q.id }}">
+        <button type="submit" class="secondary" data-testid="practice-submit-{{ q.id }}">Check</button>
+      </form>
+      <div id="practice-feedback-{{ q.id }}" class="practice-feedback" data-testid="practice-feedback-{{ q.id }}" aria-live="polite"></div>
+    </li>
+  {% endfor %}
+  </ol>
+  {% else %}
+  <p class="muted" data-testid="practice-empty">No practice questions for this program yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

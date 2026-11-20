@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ status_code }} &middot; Gerald, Applied Numerical Analysis{% endblock %}
+{% block content %}
+<section class="error-page" data-testid="error-page">
+  <h1>{{ status_code }}</h1>
+  <p data-testid="error-message">{{ message }}</p>
+  <p><a href="/" data-testid="nav-home">Back to all programs</a></p>
+</section>
+{% endblock %}

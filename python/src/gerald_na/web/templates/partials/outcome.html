@@ -1,0 +1,106 @@
+{# Macros rendering one OutcomeView (presenters.outcome_view). #}
+{% macro steps_table(v) %}
+  {% if v.table.rows %}
+  <div class="table-wrap">
+    <table class="steps" data-testid="results-table">
+      <caption>Iterations ({{ v.table.rows | length }} rows, {{ v.engine }} engine)</caption>
+      <thead><tr>{% for key, label in v.table.columns %}<th scope="col" data-key="{{ key }}">{{ label }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for row in v.table.rows %}
+        <tr data-testid="step-row">
+        {% for cell in row %}
+          {% if cell.diff %}
+          <td class="diff-cell" data-testid="diff-cell" data-key="{{ cell.key }}" title="{{ cell.title }} | {{ cell.diff }}" data-diff="{{ cell.diff }}">{{ cell.text }}</td>
+          {% else %}
+          <td data-key="{{ cell.key }}" title="{{ cell.title }}">{{ cell.text }}</td>
+          {% endif %}
+        {% endfor %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted" data-testid="results-table-empty">No iteration rows.</p>
+  {% endif %}
+{% endmacro %}
+
+{% macro extras(v) %}
+  {% if v.extras %}
+  <details class="extras" data-testid="result-extras" open>
+    <summary data-testid="result-details-toggle">Result details</summary>
+    {% set scalars = v.extras | selectattr("kind", "equalto", "scalar") | list %}
+    {% if scalars %}
+    <dl class="kv">
+      {% for x in scalars %}<div data-testid="extra-{{ x.name }}"><dt>{{ x.name }}</dt><dd>{{ x.text }}</dd></div>{% endfor %}
+    </dl>
+    {% endif %}
+    {% for x in v.extras if x.kind != "scalar" %}
+      <div class="extra-block" data-testid="extra-{{ x.name }}" data-kind="{{ x.kind }}">
+        <h4>{{ x.name }}</h4>
+        {% if x.kind == "numbers" %}
+          <ol class="numbers">{% for n in x.values %}<li>{{ n }}</li>{% endfor %}</ol>
+        {% elif x.kind == "matrix" %}
+          <div class="table-wrap"><table class="matrix" data-testid="extra-table-{{ x.name }}">
+            <tbody>{% for row in x.matrix %}<tr><th scope="row">{{ loop.index }}</th>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+          </table></div>
+        {% elif x.kind == "named_records" %}
+          {% set extra_name = x.name %}
+          <div class="table-wrap"><table class="records named-records" data-testid="extra-table-{{ x.name }}">
+            <thead><tr><th scope="col">Coefficient</th><th scope="col">Value</th></tr></thead>
+            {% for rec in x.named %}{% set i = loop.index0 %}
+            <tbody data-testid="extra-{{ extra_name }}-{{ i }}" data-kind="{{ rec.kind }}">
+              <tr class="group"><th scope="rowgroup" colspan="2">{{ loop.index }}. {{ rec.label }} <code>{{ rec.form }}</code></th></tr>
+              {% for key, text in rec.fields %}<tr data-testid="extra-{{ extra_name }}-{{ i }}-{{ key }}"><th scope="row">{{ key }}</th><td>{{ text }}</td></tr>{% endfor %}
+            </tbody>
+            {% endfor %}
+          </table></div>
+        {% elif x.kind == "records" %}
+          <div class="table-wrap"><table class="records" data-testid="extra-table-{{ x.name }}">
+            <thead><tr><th scope="col">#</th>{% for c in x.columns %}<th scope="col">{{ c }}</th>{% endfor %}</tr></thead>
+            <tbody>{% for row in x.records %}<tr><th scope="row">{{ loop.index }}</th>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+          </table></div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </details>
+  {% endif %}
+{% endmacro %}
+
+{% macro charts(v) %}
+  {% if v.figures %}
+  <div class="charts" data-testid="result-chart" data-chart-host>
+    {% for f in v.figures %}
+    <div class="chart" data-figure="{{ f.id }}" data-testid="chart-{{ f.id }}" role="img" aria-label="{{ f.title }}"></div>
+    {% endfor %}
+    <script type="application/json" data-chart-spec data-testid="result-chart-data">{{ v.figures | tojson }}</script>
+  </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro summary(v) %}
+  {% if v.ok %}
+  <dl class="summary" data-testid="result-status" data-status="{{ v.status }}">
+    <div><dt>Result</dt><dd class="value" data-testid="result-value">{{ v.value_text }}</dd></div>
+    <div><dt>Converged</dt><dd data-testid="result-converged">{{ "yes" if v.converged else "no" }}</dd></div>
+    <div><dt>Iterations</dt><dd data-testid="result-iterations">{{ v.iterations }}</dd></div>
+    <div><dt>Engine</dt><dd data-testid="result-engine">{{ v.engine }} ({{ "%.1f" | format(v.elapsed_ms) }} ms)</dd></div>
+  </dl>
+  {% else %}
+  <div class="alert error" role="alert" data-testid="result-error" data-code="{{ v.error_code }}">
+    <p><strong data-testid="result-error-code">{{ v.error_code }}</strong>
+      <span data-testid="result-error-message">{{ v.error_message }}</span></p>
+    <p class="muted">{{ v.engine }} engine{% if v.table.rows %}; the {{ v.table.rows | length }} iteration rows computed before the error are shown below{% endif %}.</p>
+  </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro book_text(v, testid="book-text") %}
+  {% if v.book_text %}
+  <figure class="book-text">
+    <figcaption>Book-format output ({{ v.engine }})</figcaption>
+    <pre data-testid="{{ testid }}">{{ v.book_text }}</pre>
+  </figure>
+  {% endif %}
+  {% if v.verbose_text %}<pre class="verbose" data-testid="verbose-text">{{ v.verbose_text }}</pre>{% endif %}
+{% endmacro %}

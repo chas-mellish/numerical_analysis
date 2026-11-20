@@ -1,0 +1,72 @@
+# Test fixture: unconfirmed book reference, no scan, data instead of a function (like Lagrange).
+id = "lagrange_like"
+title = "Lagrange-like"
+method = "Interpolation"
+summary = "Fixture entry with an unconfirmed reference and no scan."
+book_ref_confirmed = false
+precision_notes = "None."
+book_output = "2.3119"
+
+[book_ref]
+chapter = 2
+
+[[inputs]]
+name = "n"
+type = "int"
+label = "N"
+default = 2
+min = 2
+max = 10
+help = "Number of points."
+card = 1
+
+[[inputs]]
+name = "points"
+type = "point_list"
+label = "Points"
+default = [[1.0, 2.0], [3.0, 4.0]]
+length = 2
+help = "Data points."
+card = 2
+
+[[inputs]]
+name = "xin"
+type = "real"
+label = "XIN"
+default = 2.0
+help = "Where to interpolate."
+card = 3
+
+[data_card]
+text = """
+ 2
+1.0       2.0
+3.0       4.0
+2.0
+"""
+values = { n = 2, points = [[1.0, 2.0], [3.0, 4.0]], xin = 2.0 }
+
+[function]
+takes_function = false
+
+[trace]
+step_columns = [{ key = "i", label = "I", format = "I2" }, { key = "term", label = "TERM", format = "F10.4" }]
+
+[[expected]]
+name = "value"
+kind = "real"
+book_value = 3.0
+tol_real64 = 1.0e-4
+tol_real32 = 1.0e-4
+
+[files]
+legacy = ["legacy_code/lagrange_like.f90"]
+fortran_module = "fortran/src/lagrange_like_mod.f90"
+fortran_app = "fortran/app/lagrange_like.f90"
+fortran_executable = "lagrange_like"
+python_callable = "math:sqrt"
+study_page = "content/lagrange_like.md"
+
+[chart]
+kind = "interpolant"
+options = { show_nodes = true }

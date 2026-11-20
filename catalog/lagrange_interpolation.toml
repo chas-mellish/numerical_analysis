@@ -1,0 +1,329 @@
+# Lagrangian polynomial interpolation. Book reference UNCONFIRMED and NO SCAN (DD1): the program
+# is known only from the OCR text legacy_code/fortran/chapter_2/polynomial.F90, which also carries
+# the data card and the book's printed result. Schema: docs/architecture.md, "Catalog schema".
+# Every correction below is derived from FORTRAN syntax, the FORMAT Hollerith counts and the
+# printed result 2.3119 (verified numerically), not from a page image.
+
+id = "lagrange_interpolation"
+title = "Lagrangian interpolation"
+method = "Lagrange interpolating polynomial"
+summary = """
+Lagrangian interpolation evaluates, at one point XIN, the unique polynomial of degree N-1 that
+passes through N data pairs (X(I), Y(I)). Written in Lagrange form the polynomial is a sum of N
+terms, TERM(I) = Y(I) * L_I(XIN), where the basis polynomial L_I is the product over J /= I of
+(XIN - X(J))/(X(I) - X(J)); L_I is 1 at X(I) and 0 at every other node, so the sum reproduces the
+data exactly. The book's program reads N (at most 10) and the pairs, forms each term with a
+double DO loop and accumulates YOUT. With the five pairs of its data card, whose X column is
+SINH(Y) to four decimals, it interpolates the inverse function at X = 5.0 and prints 2.3119
+(the exact ASINH(5) is 2.3124383).
+"""
+book_ref_confirmed = false
+precision_notes = """
+There is no scan of this program: its listing, data card and output are known only from an OCR
+text, so the transcription could not be checked against a page image (see the errata). The
+printed result 2.3119 is the only book digit string; it is consistent with the corrected
+program to every printed digit.
+
+The book's run was single precision. real64 gives YOUT = 2.3119012901784366 and real32
+2.3119011 (the terms are of order 1 and partly cancel: +0.127, -0.624, +2.276, +0.565, -0.032,
+so the real32 sum keeps about 6 to 7 correct digits). Both print 2.3119 with F10.4, chopped
+(as the book's processor did) or rounded, so both builds reproduce the book text character for
+character. The golden tolerance is one unit of the last printed digit (1e-4) for both
+precisions, plus a tight 1e-12 real64 reference.
+
+The 5.4e-4 difference between 2.3119 and the true ASINH(5) = 2.3124383 is interpolation error
+(a degree-4 polynomial through five points of a curved function), not rounding error, and the
+data's own 4-decimal rounding of SINH(Y) contributes about 1e-5 more. Equal X values make
+X(I) - X(J) zero; the original divided by zero, the modern programs reject such data. Nearly
+equal X values make L_I huge and the result sensitive to rounding, which no precision fixes.
+"""
+book_output = """
+USING LAGRANGIAN POLYNOMIAL INTERPOLATION AMONG     5 VALUES,
+AT X=   5.0000 THE FUNCTION HAS VALUE OF    2.3119
+"""
+
+# No [book_ref]: chapter, program and page are unknown (DD1). The legacy file sits in chapter_2/.
+
+# ------------------------------------------------------------------ inputs (data-card order)
+# READ 100, N, (X(I), Y(I), I = 1,N)  /  100 FORMAT (I2/(2F10.0))  /  READ 101, XIN  /  101 FORMAT (F10.0)
+
+[[inputs]]
+name = "n"
+type = "int"
+label = "N"
+default = 5
+min = 1
+max = 10
+help = "Number of data pairs, 1 to 10 (DIMENSION X(10), Y(10)); must equal the number of points."
+card = 1
+
+[[inputs]]
+name = "points"
+type = "point_list"
+label = "Data pairs X(I), Y(I)"
+default = [[2.3756, 1.6], [3.2682, 1.9], [4.4571, 2.2], [6.0502, 2.5], [8.1919, 2.8]]
+min = -1.0e6
+max = 1.0e6
+help = "N pairs, X first then Y (one card each in the book). The X values must be distinct."
+card = 2
+
+[[inputs]]
+name = "xin"
+type = "real"
+label = "XIN"
+default = 5.0
+min = -1.0e6
+max = 1.0e6
+help = "The X value at which the interpolating polynomial is evaluated (may lie outside the data: extrapolation)."
+card = 3
+
+[data_card]
+# As in the OCR text: N with I2, one pair per card (2F10.0; the OCR collapsed the column spacing),
+# then XIN. The OCR shows a second "05" card after XIN; the program never reads it (see errata).
+text = """
+05
+2.3756  1.6
+3.2682  1.9
+4.4571  2.2
+6.0502  2.5
+8.1919  2.8
+5.0
+"""
+values = { n = 5, points = [[2.3756, 1.6], [3.2682, 1.9], [4.4571, 2.2], [6.0502, 2.5], [8.1919, 2.8]], xin = 5.0 }
+note = "Drivers read the cards list-directed, so the printed cards work unchanged and N may be typed as 05 or 5."
+
+# ------------------------------------------------------------------ function (DD3): data only
+
+[function]
+takes_function = false
+
+# ------------------------------------------------------------------ trace protocol (DD2)
+
+[trace]
+step_columns = [
+    { key = "i", label = "I", format = "I3" },
+    { key = "x", label = "X(I)", format = "F12.4" },
+    { key = "y", label = "Y(I)", format = "F12.4" },
+    { key = "term", label = "TERM = Y(I)*L_I(XIN)", format = "ES15.7" },
+    { key = "partial", label = "YOUT (running sum)", format = "ES15.7" },
+]
+records = []
+result_extras = []
+
+# ------------------------------------------------------------------ golden expectations (DD4)
+
+[[expected]]
+name = "value"
+kind = "real"
+field = "value"
+description = "THE FUNCTION HAS VALUE OF 2.3119 (F10.4; one unit of the last printed digit)."
+book_value = 2.3119
+tol_real64 = 1.0e-4
+tol_real32 = 1.0e-4
+real64_value = 2.3119012901784366
+tol_real64_value = 1.0e-12
+
+[[expected]]
+name = "n"
+kind = "int"
+field = "n"
+description = "INTERPOLATION AMONG 5 VALUES (I3)."
+book_value = 5
+
+[[expected]]
+name = "iterations"
+kind = "int"
+description = "Terms summed by the DO 20 loop (one per data pair)."
+book_value = 5
+
+[[expected]]
+name = "xin"
+kind = "real"
+field = "xin"
+description = "AT X = 5.000 (F10.3; the OCR text shows 5.0000, which F10.3 cannot print)."
+book_value = 5.0
+tol_real64 = 1.0e-3
+tol_real32 = 1.0e-3
+
+# ------------------------------------------------------------------ files
+
+[files]
+legacy = ["legacy_code/fortran/chapter_2/polynomial.F90"]
+fortran_module = "fortran/src/lagrange_mod.f90"
+fortran_app = "fortran/app/lagrange_interpolation.f90"
+fortran_executable = "lagrange_interpolation"
+python_callable = "gerald_na.algorithms.lagrange:lagrange"
+study_page = "content/lagrange_interpolation.md"
+
+[chart]
+# Data points (nodes), the interpolating polynomial curve, and the evaluated point (XIN, value).
+# The curve is sampled over the span of the nodes widened to include XIN (extrapolation is
+# visible); gerald_na.web.charts evaluates the same Lagrange polynomial from the nodes.
+# Option names: docs/architecture.md, "Chart kinds".
+kind = "interpolant"
+options = { points_input = "points", count_input = "n", x_input = "xin", samples = 101, x_label = "X", y_label = "Y" }
+
+# ------------------------------------------------------------------ practice questions
+# Reference answers computed with the engines (real64; identical on Python and Fortran).
+
+[[practice]]
+id = "book-value"
+prompt = "Run the book's data card (five pairs, XIN = 5.0). What value does the interpolating polynomial give? Give it to 5 decimals."
+answer_field = "value"
+answer = 2.3119012901784366
+tolerance = 5.0e-6
+explanation = "The five terms are .12699, -.62427, 2.27635, .56451 and -.03167; their sum 2.311901 prints as 2.3119. The exact ASINH(5) = 2.3124383, so the interpolation error is about 5.4E-4."
+
+[[practice]]
+id = "node-reproduction"
+prompt = "Keep the book's five pairs but set XIN = 6.0502, the fourth X value. What value is printed?"
+inputs = { xin = 6.0502 }
+answer_field = "value"
+answer = 2.5
+tolerance = 1.0e-9
+explanation = "At a node every basis polynomial except L_4 contains the factor (XIN - X(4)) = 0, and L_4 = 1, so the polynomial returns Y(4) = 2.5: Lagrange interpolation reproduces its data."
+
+[[practice]]
+id = "three-point-extrapolation"
+prompt = "Use only the first three pairs (N = 3: X = 2.3756, 3.2682, 4.4571) and XIN = 5.0. What value do you get, and is it better or worse than the five-point answer?"
+inputs = { n = 3, points = [[2.3756, 1.6], [3.2682, 1.9], [4.4571, 2.2]], xin = 5.0 }
+answer_field = "value"
+answer = 2.2991573414184674
+tolerance = 5.0e-6
+explanation = "2.29916, an error of 1.3E-2 against ASINH(5) = 2.31244: XIN = 5 lies outside the three nodes (extrapolation) and the quadratic cannot follow the curvature. The five-point value straddles XIN and errs by only 5.4E-4."
+
+[[practice]]
+id = "inverse-at-3"
+prompt = "With the book's five pairs, interpolate at XIN = 3.0. The exact answer is ASINH(3) = 1.8184465. What does the program give?"
+inputs = { xin = 3.0 }
+answer_field = "value"
+answer = 1.818079452259077
+tolerance = 5.0e-6
+explanation = "1.81808, an error of 3.7E-4. XIN = 3 lies between the first two nodes, where the interpolation error factor (XIN - X(1))...(XIN - X(5)) is large, so the error is similar to the one at XIN = 5."
+
+[[practice]]
+id = "quadratic-exact"
+prompt = "Enter N = 3 with the points (1, 1), (2, 4), (4, 16) of Y = X**2 and XIN = 2.5. What value is printed?"
+inputs = { n = 3, points = [[1.0, 1.0], [2.0, 4.0], [4.0, 16.0]], xin = 2.5 }
+answer_field = "value"
+answer = 6.25
+tolerance = 1.0e-12
+explanation = "The interpolating polynomial through N points is unique and has degree at most N-1, so for data from a quadratic and N = 3 it is that quadratic: 2.5**2 = 6.25, exact up to rounding."
+
+[[practice]]
+id = "terms-summed"
+prompt = "How many terms does the DO 20 loop add for the book's data card?"
+answer_field = "iterations"
+answer = 5
+tolerance = 0.0
+explanation = "One term per data pair: N = 5. Each term needs N-1 = 4 factors, so the program performs N(N-1) = 20 multiplications and divisions in the inner loop."
+
+# ------------------------------------------------------------------ errata
+# Mirrored in the ERRATA header of fortran/app/lagrange_interpolation.f90 and on
+# content/lagrange_interpolation.md. No scan exists: "ocr_slip" items are corrections of the OCR
+# text justified by syntax, the Hollerith counts or the printed result, not by a page image.
+
+[[errata]]
+id = "arithmetic-if-operator"
+kind = "ocr_slip"
+original = "IF (I=J) 9,10,9"
+corrected = "IF (I-J) 9,10,9"
+note = "An arithmetic IF takes an expression; I-J is zero exactly when J = I, whose factor is skipped. The modern code writes IF (I /= J)."
+
+[[errata]]
+id = "product-term-parentheses"
+kind = "ocr_slip"
+original = "9 TERM = TERM*(XIN - X(J)/X(I) - X(J))"
+corrected = "9 TERM = TERM*(XIN - X(J))/(X(I) - X(J))"
+note = "The OCR lost the parentheses around the division. Only the corrected factor is the Lagrange basis polynomial, and only it reproduces the printed 2.3119. Evaluated left to right, (TERM*(XIN - X(J)))/(X(I) - X(J)), in both engines."
+
+[[errata]]
+id = "format-i2"
+kind = "ocr_slip"
+original = "100 FORMAT (12/(2F10.0))"
+corrected = "100 FORMAT (I2/(2F10.0))"
+note = "\"I\" was read as \"1\". N is read with I2 from the first card (05); format reversion then reads one X, Y pair per card with 2F10.0."
+
+[[errata]]
+id = "pair-column-order"
+kind = "ocr_slip"
+original = "data cards printed as \"2.3756  1.6\" with the column spacing collapsed"
+corrected = "X(I) in columns 1-10, Y(I) in columns 11-20: X = 2.3756 ... 8.1919, Y = 1.6 ... 2.8"
+note = "The READ list is X(I), Y(I). Verified numerically: this order gives 2.3119013 at XIN = 5.0 (the book's 2.3119); the swapped order gives 63.35. The X column is SINH(Y) to four decimals, so the book interpolates the inverse function ASINH."
+
+[[errata]]
+id = "output-spacing"
+kind = "ocr_slip"
+original = "USING ... AMONG     5 VALUES, / AT X=   5.0000 THE FUNCTION HAS VALUE OF    2.3119"
+corrected = " USING LAGRANGIAN POLYNOMIAL INTERPOLATION AMONG   5 VALUES, / AT X =      5.000 THE FUNCTION HAS VALUE OF     2.3119"
+note = "The Hollerith counts 49, 8, 8 and 27 are all consistent with their texts, so FORMAT 200 fixes the layout: I3 gives two blanks before 5, F10.3 prints 5.000 (the OCR's 5.0000 is impossible) and F10.4 prints 2.3119. The OCR's blank runs are artifacts; the drivers follow the FORMAT."
+
+[[errata]]
+id = "trailing-05-card"
+kind = "ocr_slip"
+original = "a second card \"05\" after XIN = 5.0, before ZZZZ"
+corrected = "not part of the data card"
+note = "The program reads N, the N pairs and XIN, prints and calls EXIT, so a further card is never read. It is probably a listing/OCR duplicate or the start of an unrun second data set; uncertain without a scan. The drivers ignore anything after XIN."
+
+[[errata]]
+id = "file-extension-and-columns"
+kind = "ocr_slip"
+original = "polynomial.F90 with ragged label and continuation columns"
+corrected = "fixed-form card layout (labels in columns 1-5, continuation marks 1 and 2 in column 6); modern free-form source in lagrange_interpolation.f90"
+note = "The .F90 suffix tells compilers the file is free-form source to be preprocessed, but the listing is fixed-form FORTRAN with C comment cards and job-control cards, so it could not compile under that name. Layout only."
+
+[[errata]]
+id = "deck-control-cards"
+kind = "original_quirk"
+original = "ZZJOB 5 / CSC 001 GERALD, C, F / ZZFORX5 / *LIST PRINTER / ZZZZ"
+corrected = "dropped"
+note = "Job-control cards of the same monitor as the bisection deck, not FORTRAN; they appear in the printout only because the deck was listed and are not echoed."
+
+[[errata]]
+id = "dimension-limit"
+kind = "modernization"
+original = "DIMENSION X(10), Y(10) with no check on N"
+corrected = "N must be 1 to 10: DEGREE error (DegreeError) before the pairs are read"
+note = "N above 10 overran the arrays in the original. The catalog form bounds N to 1..10; a card fed directly to the driver gets ERROR,code=DEGREE."
+
+[[errata]]
+id = "duplicate-x"
+kind = "modernization"
+original = "X(I) = X(J) for I /= J divides by zero at label 9"
+corrected = "INPUT error naming the first equal pair, before any term: X(i) AND X(j) ARE EQUAL"
+note = "Interpolation needs distinct nodes. The original would divide by zero (a machine stop or garbage); both engines now reject the data with the same message. -0.0 and +0.0 count as equal."
+
+[[errata]]
+id = "non-finite-values"
+kind = "modernization"
+original = "no check (the original machine had no IEEE infinities or NaN)"
+corrected = "a term or the running sum that overflows is an INPUT error after the completed rows"
+note = "Only possible with extreme or nearly equal X values; the same rule as the other programs' non-finite function values."
+
+[[errata]]
+id = "list-directed-input"
+kind = "modernization"
+original = "READ 100 / READ 101 with fixed card columns (I2, 2F10.0, F10.0)"
+corrected = "list-directed read of N, the N pairs and XIN, in the same order"
+note = "The printed cards work unchanged and may be typed with any spacing; the engines also check that N equals the number of pairs supplied."
+
+[[errata]]
+id = "structured-control-flow"
+kind = "modernization"
+original = "IF (I-J) 9,10,9 / 10 CONTINUE / 20 YOUT = YOUT + TERM / CALL EXIT"
+corrected = "IF (I /= J) inside DO ... END DO loops; normal termination or STOP with an exit status"
+note = "The arithmetic IF's two nonzero branches both go to label 9, so a single test is exact."
+
+[[errata]]
+id = "truncated-digits"
+kind = "original_quirk"
+original = "line printer that chops Fw.d digits and prints no leading zero (as in the bisection listing)"
+corrected = "book text rendered with RZ rounding and no leading zero"
+note = "Same deck-control cards as the bisection program, so the same output conventions are assumed. For the book card it makes no difference (5.000 and 2.3119 either way)."
+
+[[errata]]
+id = "unconfirmed-book-reference"
+kind = "original_quirk"
+original = "legacy file in chapter_2/, no scan, no page number"
+corrected = "catalog id lagrange_interpolation with book_ref_confirmed = false and no scan_pdf"
+note = "The chapter, program number and page in the book are unknown; a confirmed reference can be added later without renaming files (DD1)."

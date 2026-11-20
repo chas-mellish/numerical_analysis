@@ -1,0 +1,398 @@
+# Chapter 4, Program 1: first and second derivatives by central-difference formulas.
+# Schema: docs/architecture.md, "Catalog schema". Transcribed from
+# legacy_code/fortran/chapter_4/derivatives.pdf (book page 90); every value below was read from
+# the scan. There is no OCR text of this listing.
+
+id = "ch04_p01"
+title = "Derivatives by central differences"
+method = "Central-difference formulas"
+summary = """
+Central differences estimate derivatives from function values on both sides of X:
+DX = (F(X+H) - F(X-H))/(2H) approximates F'(X) and DDX = (F(X+H) - 2F(X) + F(X-H))/H**2
+approximates F''(X), both with an error proportional to H**2. The book's program reads X and a
+starting H, then prints DX and DDX for ten values of H, dividing H by ten after every row
+(H = 0.1*H), to show how the approximations improve as H shrinks -- until round-off takes over.
+With the data card 0.0 0.1 and F(X) = X**2*EXP(X), whose derivatives at X = 0 are F'(0) = 0 and
+F''(0) = 2, the book prints DX falling from 1.0016675E-02 to 0.0000000E-99 and DDX between
+1.9999999E+00 and 2.0100083E+00.
+"""
+book_ref_confirmed = true
+precision_notes = """
+At X = 0 the book function gives exactly DX = H*SINH(H) (about H**2) and DDX = 2*COSH(H)
+(about 2 + H**2), so the truncation error of both formulas falls by a factor of 100 per row.
+F(X) = 0 at X = 0, so the second difference FR - 2*FO + FL has no cancellation: DDX stays within
+a few units of the eighth digit of 2 in every precision, and the book's oscillation
+(2.0000999 and 2.0000009 for H = 1E-2 and 1E-3, 1.9999999 for H = 1E-5..1E-7, then 2.0000000)
+is round-off of its machine.
+The first difference FR - FL is a cancellation: its relative size is about 2H, so it loses all
+of its digits once 2H drops below the machine's precision. The book prints DX = 1.0000150E-04
+for H = 1E-2 (true 1.0000167E-04), 9.9995000E-07 for H = 1E-3, 5.0000000E-15 for H = 1E-7 and
+0.0000000E-99 for H <= 1E-8: on an 8-digit machine F(X+H) and F(X-H) become equal. The
+chopped-arithmetic models of gerald_na.tools.book_machine (central_difference_rows) do not
+reproduce these digits either (8-digit decimal: 1.0000135E-04 for row 2); they depend on the
+machine's own EXPF routine, which is unknown.
+
+Real64 keeps about 16 digits, so every real64 row stays close to H*SINH(H): row 2 prints
+1.0000166E-04 (0.00010000166667499881), the last row 1.0000000E-20 (value
+1.0000000031710762e-20). A real32 build (IEEE binary32, about 7 digits) behaves like the book:
+EXP(H) rounds to 1 for H below 6E-8, so DX is exactly 0 for the last three rows. DDX in real64 is
+2.0001000 at H = 1E-2 and exactly 2.0 from H = 1E-8 on. The SINGLE driver (gfortran -DSINGLE,
+checked against the build; the real32 tolerances were first set from a float32 emulation) prints
+DX = 1.0016676E-02, 1.0000184E-04, 1.0000462E-06, 1.0000888E-08, 9.9920065E-11, 9.7578184E-13,
+8.4703277E-15, then 0.0000000E-99 three times, and DDX = 2.0100085, 2.0000998, 2.0000009, then
+2.0000000; its H is the binary32 accumulation (row 1: 0.100000001). Its largest deviations from
+the book are 1.5E-9 in H, 2.0E-9 in DX and 2.7E-7 in DDX (row 1, a few units of real32's last
+digit), all inside the real32 tolerances below.
+
+The golden tests therefore compare per column in absolute terms: H within 1E-12 (real32 1E-8),
+DX within 2E-9 (real32 1E-8; the book's largest DX deviation is 1.7E-9 at H = 1E-2, a cancellation
+error of its machine) and DDX within 2E-7 (real32 1E-6; the book's deviations are at most one unit
+of the eighth digit). The well-conditioned first row (first_dx, first_ddx) is also compared on
+its own, within one unit of the book's last printed digit; for DX rows with H <= 1E-3 an absolute
+tolerance of 2E-9 is not a test of their digits -- those digits are round-off on every machine,
+which is the point of the program. The real64 runs are pinned to their exact values in addition
+(real64_value, 1E-12 absolute).
+
+H is accumulated (H = 0.1*H), so H is not exactly 10**-k on a binary machine: real64 row 10 has
+H = 1.0000000000000006e-10. H and the echoed X are printed rounded to nearest, DX and DDX chopped
+(erratum book-number-format).
+
+Non-finite function values have no counterpart on the original machine. When F(X), F(X+H) or
+F(X-H) is NaN or infinite (EXP(X) overflows for X > 709 in real64, LOG10 of a non-positive
+argument), or DX or DDX overflows, both engines stop with an INPUT error and keep the rows
+computed so far. The book's computer is not identified (docs/architecture.md, "The book's
+computer"); the ZZJOB / ZZFORX5 cards and the zero printed as 0.0000000E-99 resemble the IBM 1620
+Monitor and its floating-point zero, but the identification stays open.
+"""
+book_output = """
+DERIVATIVES COMPUTED BY CENTRAL DIFFERENCE FORMULAS
+AT X =  0.00
+
+   H             DX                 DDX
+
+ 1.0E-01      1.0016675E-02      2.0100083E+00
+ 1.0E-02      1.0000150E-04      2.0000999E+00
+ 1.0E-03      9.9995000E-07      2.0000009E+00
+ 1.0E-04      1.0000000E-08      2.0000000E+00
+ 1.0E-05      9.9500000E-11      1.9999999E+00
+ 1.0E-06      9.5000000E-13      1.9999999E+00
+ 1.0E-07      5.0000000E-15      1.9999999E+00
+ 1.0E-08      0.0000000E-99      2.0000000E+00
+ 1.0E-09      0.0000000E-99      2.0000000E+00
+ 1.0E-10      0.0000000E-99      2.0000000E+00
+"""
+
+[book_ref]
+chapter = 4
+program = 1
+page = 90
+title = "Numerical Differentiation"
+
+# ------------------------------------------------------------------ inputs (data-card order)
+# READ 100, X, H   /   100 FORMAT (2F10.0)
+
+[[inputs]]
+name = "x"
+type = "real"
+label = "X"
+default = 0.0
+min = -100.0
+max = 100.0
+help = "The point at which F'(X) and F''(X) are estimated. The heading prints it with F5.2."
+card = 1
+
+[[inputs]]
+name = "h"
+type = "real"
+label = "H"
+default = 0.1
+min = 1.0e-6
+max = 10.0
+help = "Initial step (delta x). Each of the ten rows divides it by ten: H = 0.1*H."
+card = 1
+
+[data_card]
+# X in columns 1-10 and H in columns 11-20 of the card (FORMAT 2F10.0); the card after it reads ZZZZ.
+text = "0.0       0.1"
+values = { x = 0.0, h = 0.1 }
+note = "Drivers read the card list-directed, so the printed card works unchanged."
+
+# ------------------------------------------------------------------ function presets (DD3)
+
+[function]
+takes_function = true
+variable = "x"
+default_preset = 1
+
+[[function.presets]]
+id = 1
+label = "Book: x^2 e^x"
+expr = "X**2*EXP(X)"
+fortran_preset = 1
+note = "The book's statement function F(X) = X**2*EXPF(X). F'(x) = (x^2 + 2x) e^x, F''(x) = (x^2 + 4x + 2) e^x: 0 and 2 at x = 0."
+
+[[function.presets]]
+id = 2
+label = "sin(x)"
+expr = "SIN(X)"
+fortran_preset = 2
+note = "F'(x) = cos(x), F''(x) = -sin(x). At x = 1: 0.5403023 and -0.8414710; the central differences give sin(H)/H*cos(x) and 2(cos(H) - 1)/H^2*sin(x)."
+
+[[function.presets]]
+id = 3
+label = "1 + log10(x) (p. 91, problem 2)"
+expr = "1 + LOG10(X)"
+fortran_preset = 3
+note = "The table of chapter 4, problem 2 (book p. 91). F'(x) = 1/(x ln 10): 2.2857604 at x = 0.19. Undefined for x - H <= 0."
+
+# ------------------------------------------------------------------ trace protocol (DD2)
+
+[trace]
+step_columns = [
+    { key = "k", label = "I", format = "I3" },
+    { key = "h", label = "H", format = "ES8.1" },
+    { key = "dx", label = "DX", format = "ES14.7" },
+    { key = "ddx", label = "DDX", format = "ES14.7" },
+]
+records = []
+result_extras = [
+    { key = "fo", type = "real", description = "FO = F(X), the centre value used by every DDX." },
+    { key = "first_dx", type = "real", description = "DX of the first row (H as on the data card)." },
+    { key = "first_ddx", type = "real", description = "DDX of the first row (H as on the data card)." },
+    { key = "last_ddx", type = "real", description = "DDX of the last row (the smallest H); value is DX of that row." },
+]
+
+# ------------------------------------------------------------------ golden expectations (DD4)
+
+[[expected]]
+name = "steps"
+kind = "rows"
+description = "The 10 printed rows H, DX, DDX (book digits are those of its 8-digit machine; see precision_notes)."
+columns = ["k", "h", "dx", "ddx"]
+tol_real64 = { h = 1.0e-12, dx = 2.0e-9, ddx = 2.0e-7 }
+tol_real32 = { h = 1.0e-8, dx = 1.0e-8, ddx = 1.0e-6 }
+book_value = [
+    [1, 1.0e-1, 1.0016675e-2, 2.0100083],
+    [2, 1.0e-2, 1.0000150e-4, 2.0000999],
+    [3, 1.0e-3, 9.9995000e-7, 2.0000009],
+    [4, 1.0e-4, 1.0000000e-8, 2.0000000],
+    [5, 1.0e-5, 9.9500000e-11, 1.9999999],
+    [6, 1.0e-6, 9.5000000e-13, 1.9999999],
+    [7, 1.0e-7, 5.0000000e-15, 1.9999999],
+    [8, 1.0e-8, 0.0, 2.0000000],
+    [9, 1.0e-9, 0.0, 2.0000000],
+    [10, 1.0e-10, 0.0, 2.0000000],
+]
+real64_value = [
+    [1, 0.1, 0.010016675001984412, 2.010008336111607],
+    [2, 0.010000000000000002, 0.00010000166667499881, 2.0001000008333363],
+    [3, 0.0010000000000000002, 1.0000001666666187e-06, 2.0000010000000836],
+    [4, 0.00010000000000000003, 1.0000000016670753e-08, 2.0000000100000004],
+    [5, 1.0000000000000004e-05, 1.0000000000085782e-10, 2.0000000001],
+    [6, 1.0000000000000004e-06, 9.999999999714196e-13, 2.000000000001],
+    [7, 1.0000000000000005e-07, 9.999999990310974e-15, 2.0000000000000098],
+    [8, 1.0000000000000005e-08, 9.999999948895776e-17, 2.0],
+    [9, 1.0000000000000005e-09, 1.0000000272452008e-18, 2.0],
+    [10, 1.0000000000000006e-10, 1.0000000031710762e-20, 2.0],
+]
+tol_real64_value = 1.0e-12
+
+[[expected]]
+name = "first_dx"
+kind = "real"
+description = "Row 1: DX = 1.0016675E-02 for H = .1 (H*SINH(H) = 0.0100166750020; well conditioned)."
+book_value = 1.0016675e-2
+tol_real64 = 1.0e-9
+tol_real32 = 1.0e-8
+real64_value = 0.010016675001984412
+tol_real64_value = 1.0e-15
+
+[[expected]]
+name = "first_ddx"
+kind = "real"
+description = "Row 1: DDX = 2.0100083E+00 for H = .1 (2*COSH(H) = 2.0100083361)."
+book_value = 2.0100083
+tol_real64 = 1.0e-7
+tol_real32 = 1.0e-6
+real64_value = 2.010008336111607
+tol_real64_value = 1.0e-12
+
+[[expected]]
+name = "value"
+kind = "real"
+field = "value"
+description = "DX of the last row (H = 1.E-10): the book prints 0.0000000E-99 (its F(X+H) and F(X-H) are equal); real64 keeps H*SINH(H) = 1.0E-20."
+book_value = 0.0
+tol_real64 = 1.0e-15
+tol_real32 = 1.0e-15
+real64_value = 1.0000000031710762e-20
+tol_real64_value = 1.0e-30
+
+[[expected]]
+name = "last_ddx"
+kind = "real"
+description = "DDX of the last row: 2.0000000E+00."
+book_value = 2.0
+tol_real64 = 1.0e-7
+tol_real32 = 1.0e-6
+real64_value = 2.0
+tol_real64_value = 1.0e-12
+
+[[expected]]
+name = "iterations"
+kind = "int"
+description = "DO 10 I = 1,10: ten printed rows."
+book_value = 10
+
+# ------------------------------------------------------------------ files
+
+[files]
+# No OCR text of this listing exists: the legacy tab shows the scanned pages (the listing on
+# p. 90 and the problems on p. 91 used by the practice questions).
+legacy = [
+    "legacy_code/fortran/chapter_4/derivatives.pdf",
+    "legacy_code/fortran/chapter_4/derivatives_log_example.pdf",
+]
+scan_pdf = "legacy_code/fortran/chapter_4/derivatives.pdf"
+fortran_module = "fortran/src/derivative_mod.f90"
+fortran_app = "fortran/app/ch04_p01_central_difference.f90"
+fortran_executable = "ch04_p01_central_difference"
+python_callable = "gerald_na.algorithms.central_difference:central_difference"
+study_page = "content/ch04_p01.md"
+
+[chart]
+kind = "convergence"
+# DX and DDX against H on a log axis (|DX| on a log scale too), plus the change between
+# successive rows, which estimates the error of the earlier row: it falls like H**2 until
+# round-off makes it grow again. Option names: docs/architecture.md, "Chart kinds".
+options = { x_key = "h", y_keys = ["dx", "ddx"], log_x = true, log_y_keys = ["dx"], changes = true }
+
+# ------------------------------------------------------------------ practice questions
+# Reference answers computed with the engines (real64).
+
+[[practice]]
+id = "book-first-dx"
+prompt = "Run the book's data card (0.0 0.1). What DX does the first row (H = 0.1) give? Give 8 significant digits."
+answer_field = "first_dx"
+answer = 0.010016675001984412
+tolerance = 5.0e-11
+explanation = "At X = 0 the central difference of X**2*EXP(X) is exactly H*SINH(H) = 0.010016675, although F'(0) = 0: the truncation error H**2/6*F'''(0) = 0.01 is the whole value. The book prints 1.0016675E-02 too."
+
+[[practice]]
+id = "rows"
+prompt = "How many rows (values of H) does the program print?"
+answer_field = "iterations"
+answer = 10
+tolerance = 0.0
+explanation = "DO 10 I = 1,10 prints ten rows; statement 10 (H = 0.1*H) divides H by ten after each one, so the last H is 1.E-10 for the book's card."
+
+[[practice]]
+id = "book-last-ddx"
+prompt = "With the book's card, what DDX does a real64 run print for the last row (H = 1.E-10)?"
+answer_field = "last_ddx"
+answer = 2.0
+tolerance = 1.0e-7
+explanation = "Exactly 2.0, the analytic F''(0). F(0) = 0, so FR - 2*FO + FL = FR + FL has no cancellation and DDX keeps its digits for any H; the book's 1.9999999 at H = 1E-5..1E-7 is round-off of its 8-digit machine."
+
+[[practice]]
+id = "sin-second-derivative"
+prompt = "Choose preset 2 (sin(x)) with X = 1.0 and H = 0.1. What DDX does the first row give? Give 7 decimals."
+inputs = { x = 1.0 }
+preset = 2
+answer_field = "first_ddx"
+answer = -0.8407699926874178
+tolerance = 5.0e-8
+explanation = "The exact F''(1) = -sin(1) = -0.8414710. The central difference is 2(cos(H) - 1)/H**2 * sin(1) = -0.8407700, an error of 7.0E-4 = H**2/12 * F''''(1), as the error term predicts."
+
+[[practice]]
+id = "log-table-derivative"
+prompt = "Book p. 91, problem 2: choose preset 3 (1 + log10(x)) with X = 0.19 and H = 0.02, the spacing of the book's table. What DX does the first row give? Give 6 decimals."
+inputs = { x = 0.19, h = 0.02 }
+preset = 3
+answer_field = "first_dx"
+answer = 2.2942593338911355
+tolerance = 5.0e-7
+explanation = "(F(0.21) - F(0.17))/0.04 = 2.294259. The analytical value 1/(0.19 ln 10) = 2.285760, so the error is 8.5E-3, about H**2/6 * F'''(0.19). With the book's four-decimal table, (0.3222 - 0.2304)/0.04 = 2.295: the table's rounding adds another 7E-4."
+
+[[practice]]
+id = "log-smallest-h"
+prompt = "Same run (preset 3, X = 0.19, H = 0.02). What DX does the last row (H = 2.E-11) give? Give 8 decimals and compare with 1/(0.19 ln 10) = 2.28576043."
+inputs = { x = 0.19, h = 0.02 }
+preset = 3
+answer_field = "value"
+answer = 2.2857604697890097
+tolerance = 5.0e-9
+explanation = "2.28576047: off by 3.9E-8, worse than row 5 (H = 2E-6, error 8E-11). With H = 2E-11 the difference F(X+H) - F(X-H) is only 9E-11 of F = 0.28, so the 1E-16 relative round-off of F is magnified by about F*eps/H. The best H balances the two errors."
+
+# ------------------------------------------------------------------ errata
+# Mirrored in the ERRATA header of fortran/app/ch04_p01_central_difference.f90 and on content/ch04_p01.md.
+
+[[errata]]
+id = "job-control-cards"
+kind = "original_quirk"
+original = "ZZJOB 5 / ZZFORX5 / *LIST PRINTER before the program; ZZZZ after the data card"
+corrected = "omitted: they are deck-control cards of the book's monitor system, not Fortran"
+note = "The same kind of cards precede the Chapter 1 listings. The modern drivers read only the data card from stdin."
+
+[[errata]]
+id = "expf-is-exp"
+kind = "modernization"
+original = "F(X) = X**2*EXPF(X)"
+corrected = "X**2*EXP(X) (preset 1)"
+note = "EXPF is the FORTRAN II name of the exponential function; gerald_na.expr accepts EXPF as an alias of EXP, so a learner may type the book's spelling."
+
+[[errata]]
+id = "fo-letter-o"
+kind = "original_quirk"
+original = "FO = F(X)"
+corrected = "fo (the letter O, F at the centre point): Python result field fo and RESULT key fo"
+note = "The name is F-letter-O (F at the origin of the stencil), next to FR (right) and FL (left), not F-zero. FO is evaluated once, before the DO loop."
+
+[[errata]]
+id = "accumulated-h"
+kind = "original_quirk"
+original = "10 H = 0.1*H"
+corrected = "kept: H is multiplied by 0.1 after every row (accumulated, not recomputed as H0*10**(1-I))"
+note = "On a binary machine 0.1 is not exact, so row k uses H slightly above 10**(1-k) times the card's H: real64 row 10 has H = 1.0000000000000006E-10. Both engines accumulate H in the same way, so their rows agree bit for bit; the Fortran literal must be 0.1 of kind wp."
+
+[[errata]]
+id = "book-number-format"
+kind = "original_quirk"
+original = "201 FORMAT (1H , E8.1, 5X, E14.7, 5X, E14.7) printed as 1.0E-01 and 1.0016675E-02; F5.2 printed as 0.00"
+corrected = "H, DX and DDX rendered with ES8.1 / ES14.7 (one digit before the point, as in the scan); F5.2 with its leading zero; DX and DDX chopped (RZ), X and H rounded to nearest (RN)"
+note = "Standard E editing would print 0.1E+00 and 0.1001667E-01; the scan shows one digit before the point and 8 significant digits, like modern ES (or 1PE) editing, and keeps the leading zero of 0.00 unlike the Chapter 1 and 3 printouts. The chopping of the computed values follows the other programs; X and H are echoes of the card, and chopping their binary values would print X = .29 as 0.28 and H = 1.E-6 as 9.9E-07."
+
+[[errata]]
+id = "zero-exponent-99"
+kind = "original_quirk"
+original = "0.0000000E-99 (DX for H = 1.E-08, 1.E-09, 1.E-10)"
+corrected = "an exact zero (DX or DDX) is printed as 0.0000000E-99 in the book text (-0.0000000E-99 for a negative zero); the trace and the result carry the number 0"
+note = "The book's machine stored a floating-point zero with the smallest exponent, -99, and its output conversion printed it. Both engines reproduce the text; standard ES editing would print 0.0000000E+00."
+
+[[errata]]
+id = "small-h-round-off"
+kind = "original_quirk"
+original = "DX = 1.0000150E-04, 9.9995000E-07, 9.9500000E-11, 9.5000000E-13, 5.0000000E-15, then 0; DDX = 2.0000999, 2.0000009, 1.9999999 (scan)"
+corrected = "real64 prints DX = 1.0000166E-04, 1.0000001E-06, 1.0000000E-10, 9.9999999E-13, 9.9999999E-15, 9.9999999E-17, 1.0000000E-18, 1.0000000E-20 and DDX = 2.0001000, 2.0000010, 2.0000000"
+note = "The book's digits for small H are round-off of its 8-digit machine, which is what the program demonstrates. The golden tests compare DX within 2E-9 and DDX within 2E-7 (real32: 1E-8 and 1E-6), and the first row within one unit of the last printed digit; a real32 build reproduces the zero DX of the last three rows."
+
+[[errata]]
+id = "structured-control-flow"
+kind = "modernization"
+original = "statement function F(X); READ 100 with 100 FORMAT (2F10.0); Hollerith FORMAT 200; CALL EXIT"
+corrected = "F passed as a procedure argument (--preset N); list-directed READ of X and H; character constants in the FORMATs; the program ends normally (exit status 0)"
+note = "The order and grouping of every operation are kept: FO before the loop, then FR, FL, DX = (FR - FL)/(2*H), DDX = ((FR - 2*FO) + FL)/(H*H) and H = 0.1*H, so both engines agree bit for bit."
+
+[[errata]]
+id = "h-positive"
+kind = "modernization"
+original = "no check (H = 0 divides by zero; X and H could be anything the card holds)"
+corrected = "H <= 0 and a non-finite X or H are INPUT errors (InputError), reported before the heading is printed"
+note = "A negative H would give the same estimates with the rows mirrored; it is rejected to keep the meaning of the H column. The UI bounds are -100 <= X <= 100 and 1E-6 <= H <= 10, so H*H never underflows (the last H is at least 1E-15)."
+
+[[errata]]
+id = "non-finite-values"
+kind = "modernization"
+original = "no check (the original machine had no IEEE infinities or NaN)"
+corrected = "F(X), F(X+H) or F(X-H) returning NaN or +-Inf, or DX or DDX overflowing, is an INPUT error (trace ERROR,code=INPUT with exit status 2; otherwise a message on stderr and exit status 1), keeping the rows already computed"
+note = "The heading is printed before FO = F(X) is evaluated, so the book text of such a run holds the heading and the rows printed so far. EXP(X) overflows for X > 709 in real64 (X > 88 in real32), and LOG10 is undefined for X - H <= 0 (preset 3). Same rule as the other programs' erratum of the same id; the trace message contains no commas (DD2)."
